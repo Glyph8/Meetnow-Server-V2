@@ -1,22 +1,22 @@
 # Meetnow Server 실행 체크리스트 (Local / EC2)
 
 ## 1) 사전 확인
-- [ ] 저장소 경로: `/home/runner/work/Meetnow-Server-V2/Meetnow-Server-V2`
+- [ ] 저장소 경로: `<repository-root>`
 - [ ] Java 17 설치 확인
 - [ ] Docker / Docker Compose 사용 가능
 
 ## 2) 로컬 실행 체크리스트
 ### 2-1. 환경변수 파일 준비
-- [ ] `/home/runner/work/Meetnow-Server-V2/Meetnow-Server-V2/.env.local.example` 복사
+- [ ] `<repository-root>/.env.local.example` 복사
 ```bash
-cd /home/runner/work/Meetnow-Server-V2/Meetnow-Server-V2
+cd <repository-root>
 cp .env.local.example .env.local
 ```
 - [ ] `.env.local`에서 OAuth/AWS/AI 값 실제 값으로 수정
 
 ### 2-2. 의존 서비스 실행 (MySQL/Redis)
 ```bash
-cd /home/runner/work/Meetnow-Server-V2/Meetnow-Server-V2
+cd <repository-root>
 docker compose -f docker-compose.v1.yml up -d meetnow-db meetnow-redis
 ```
 - [ ] MySQL: `localhost:3340`
@@ -24,7 +24,7 @@ docker compose -f docker-compose.v1.yml up -d meetnow-db meetnow-redis
 
 ### 2-3. 서버 실행
 ```bash
-cd /home/runner/work/Meetnow-Server-V2/Meetnow-Server-V2
+cd <repository-root>
 set -a
 source .env.local
 set +a
@@ -48,9 +48,9 @@ curl http://localhost:8080/actuator/health
 
 ## 3) EC2 실행 체크리스트
 ### 3-1. 환경변수 파일 준비
-- [ ] `/home/runner/work/Meetnow-Server-V2/Meetnow-Server-V2/.env.prod.example` 복사 후 값 치환
+- [ ] `<repository-root>/.env.prod.example` 복사 후 값 치환
 ```bash
-cd /home/runner/work/Meetnow-Server-V2/Meetnow-Server-V2
+cd <repository-root>
 cp .env.prod.example .env.prod
 ```
 - [ ] DB/Redis/OAuth/AWS 실제 운영 값 입력
@@ -62,7 +62,7 @@ cp .env.prod.example .env.prod
 
 ### 3-3. 백엔드 이미지 빌드/실행
 ```bash
-cd /home/runner/work/Meetnow-Server-V2/Meetnow-Server-V2
+cd <repository-root>
 docker build -f Dockerfile.deploy -t meetnow-server:latest .
 docker run -d --name meetnow-server -p 8080:8080 --env-file .env.prod meetnow-server:latest
 ```
