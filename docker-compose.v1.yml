@@ -27,7 +27,7 @@ services:
   meetnow-db:
     image: mysql:latest
     environment:
-      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_ROOT_PASSWORD: 0808
       MYSQL_DATABASE: meetnow
     ports:
       - 3340:3306
