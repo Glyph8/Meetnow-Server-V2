@@ -1,6 +1,7 @@
 package timetogeter.context.promise.domain.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,15 +11,6 @@ import java.util.UUID;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(
-        name = "promise_share_key",
-        indexes = {
-                @Index(name = "idx_promise_lookup", columnList = "promise_id,lookup_version,lookup_id")
-        },
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_promise_lookup", columnNames = {"promise_id", "lookup_version", "lookup_id"})
-        }
-)
 public class PromiseShareKey {
     @Id
     private String promiseShareKeyId;

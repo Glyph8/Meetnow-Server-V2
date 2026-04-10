@@ -51,6 +51,7 @@ import java.util.regex.Pattern;
 @Transactional(readOnly = true)
 @Slf4j
 public class PromiseManageInfoService {
+    // lookupId 는 클라이언트가 전달하는 64자리 소문자 hex 인덱스 키만 허용한다.
     private static final Pattern LOOKUP_ID_PATTERN = Pattern.compile("^[0-9a-f]{64}$");
     private static final int LOOKUP_VERSION_V1 = 1;
 
@@ -380,7 +381,10 @@ public class PromiseManageInfoService {
         if (lookupId == null || lookupId.isBlank()) {
             return "********";
         }
-        String prefix = lookupId.length() >= 8 ? lookupId.substring(0, 8) : lookupId;
+        if (lookupId.length() < 8) {
+            return "********";
+        }
+        String prefix = lookupId.substring(0, 8);
         return prefix + "****";
     }
 }

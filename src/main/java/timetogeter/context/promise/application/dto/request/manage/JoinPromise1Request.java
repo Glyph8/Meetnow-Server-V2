@@ -1,6 +1,9 @@
 package timetogeter.context.promise.application.dto.request.manage;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 
 @Schema(requiredProperties = {
         "promiseId",
@@ -12,12 +15,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
         "lookupVersion"
 })
 public record JoinPromise1Request(
-        String promiseId,
-        String encPromiseId,
-        String encPromiseMemberId,
-        String encUserId,
-        String encPromiseKey,
-        String lookupId,
-        Integer lookupVersion
+        @NotBlank String promiseId,
+        @NotBlank String encPromiseId,
+        @NotBlank String encPromiseMemberId,
+        @NotBlank String encUserId,
+        @NotBlank String encPromiseKey,
+        @NotBlank @Pattern(regexp = "^[0-9a-f]{64}$") String lookupId,
+        @NotNull Integer lookupVersion
 ){
 }
