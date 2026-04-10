@@ -5,4 +5,4 @@ ALTER TABLE promise_share_key
     ADD COLUMN IF NOT EXISTS user_id VARCHAR(255) NULL;
 
 CREATE UNIQUE INDEX uk_promise_lookup
-    ON promise_share_key (promise_id, lookup_version, lookup_id);
+    ON promise_share_key (promise_id, lookup_id, lookup_version);

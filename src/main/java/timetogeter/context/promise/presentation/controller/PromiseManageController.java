@@ -23,6 +23,7 @@ import timetogeter.context.promise.application.dto.request.manage.*;
 import timetogeter.context.promise.application.dto.response.manage.*;
 import timetogeter.context.promise.application.service.PromiseManageInfoService;
 import timetogeter.global.interceptor.response.BaseResponse;
+import timetogeter.global.interceptor.response.error.dto.ErrorResponse;
 
 @RestController
 @RequestMapping("/promise")
@@ -124,7 +125,7 @@ public class PromiseManageController {
 
         - 요청: 사용자 인증 (UserPrincipal) + JoinPromise1Request
         - 처리: 기존 암호문 저장 + lookupId/lookupVersion 기반 참여키 저장
-        - 예외: 동일 lookup에 다른 encPromiseKey 요청 시 409
+        - 주의: AES-GCM 랜덤 IV 특성상 동일 평문이라도 암호문이 매번 달라질 수 있어, 암호문 직접 비교로 충돌 판정하지 않음
         """
 )
 @ApiResponses({
@@ -139,22 +140,42 @@ public class PromiseManageController {
                 )
         ),
         @ApiResponse(
-                responseCode = "409",
-                description = "기존 참여 데이터와 키 불일치",
+                responseCode = "400",
+                description = "요청 형식 오류(lookupId/lookupVersion 검증 실패 등)",
                 content = @Content(
-                        schema = @Schema(implementation = BaseResponse.class),
+                        schema = @Schema(implementation = ErrorResponse.class),
                         examples = @ExampleObject(value = """
-                            { "code": 409, "message": "약속키 데이터가 일치하지 않아요" }
+                            { "code": 400, "message": "잘못된 URL 요청이에요. 요청 포맷을 확인해주세요" }
                         """)
                 )
         ),
         @ApiResponse(
-                responseCode = "400",
-                description = "참여 횟수 초과",
+                responseCode = "403",
+                description = "권한 없음",
                 content = @Content(
-                        schema = @Schema(implementation = BaseResponse.class),
+                        schema = @Schema(implementation = ErrorResponse.class),
                         examples = @ExampleObject(value = """
-                            { "code": 400, "message": "약속 참여 시도 횟수가 초과되었습니다." }
+                            { "code": 403, "message": "접근 권한이 없어요" }
+                        """)
+                )
+        ),
+        @ApiResponse(
+                responseCode = "404",
+                description = "약속 없음",
+                content = @Content(
+                        schema = @Schema(implementation = ErrorResponse.class),
+                        examples = @ExampleObject(value = """
+                            { "code": 404, "message": "약속을 찾을 수 없어요" }
+                        """)
+                )
+        ),
+        @ApiResponse(
+                responseCode = "409",
+                description = "중복 참여 데이터 충돌(향후 deterministic fingerprint 도입 시 사용)",
+                content = @Content(
+                        schema = @Schema(implementation = ErrorResponse.class),
+                        examples = @ExampleObject(value = """
+                            { "code": 409, "message": "약속키 데이터가 일치하지 않아요" }
                         """)
                 )
         ),
@@ -162,7 +183,7 @@ public class PromiseManageController {
                 responseCode = "401",
                 description = "인증 실패",
                 content = @Content(
-                        schema = @Schema(implementation = BaseResponse.class),
+                        schema = @Schema(implementation = ErrorResponse.class),
                         examples = @ExampleObject(value = """
                             { "code": 401, "message": "인증이 필요합니다." }
                         """)
@@ -172,7 +193,7 @@ public class PromiseManageController {
                 responseCode = "500",
                 description = "서버 내부 오류",
                 content = @Content(
-                        schema = @Schema(implementation = BaseResponse.class),
+                        schema = @Schema(implementation = ErrorResponse.class),
                         examples = @ExampleObject(value = """
                             { "code": 500, "message": "서버 내부 오류가 발생했습니다." }
                         """)

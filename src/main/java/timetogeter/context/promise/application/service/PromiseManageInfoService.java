@@ -35,7 +35,6 @@ import timetogeter.context.promise.domain.entity.PromiseShareKey;
 import timetogeter.context.promise.domain.repository.PromiseShareKeyRepository;
 import timetogeter.context.promise.exception.PromiseLookupForbiddenException;
 import timetogeter.context.promise.exception.PromiseLookupValidationException;
-import timetogeter.context.promise.exception.PromiseMemberKeyConflictException;
 import timetogeter.context.promise.exception.PromiseNotFoundException;
 import timetogeter.global.interceptor.response.error.status.BaseErrorCode;
 import timetogeter.global.mail.EmailService;
@@ -241,13 +240,7 @@ public class PromiseManageInfoService {
                 .orElse(null);
 
         if (existingLookupRecord != null) {
-            if (!existingLookupRecord.getEncPromiseKey().equals(request.encPromiseKey())) {
-                joinLookupUniqueConflictCounter.increment();
-                throw new PromiseMemberKeyConflictException(
-                        BaseErrorCode.PROMISE_MEMBER_KEY_CONFLICT,
-                        "[ERROR] lookup duplicate mismatch: promiseId=" + request.promiseId() + ", lookupId=" + maskLookupId(request.lookupId())
-                );
-            }
+            // AES-GCM 랜덤 IV 특성상 암호문 문자열 비교로 평문 동일성을 판정할 수 없어 중복 lookup 요청은 idempotent 성공 처리한다.
             return new JoinPromise1Response(promise.getTitle() + " 약속에 참여하였습니다.");
         }
 
@@ -256,13 +249,7 @@ public class PromiseManageInfoService {
                 .orElse(null);
 
         if (existingEncUserRecord != null) {
-            if (!existingEncUserRecord.getEncPromiseKey().equals(request.encPromiseKey())) {
-                joinLookupUniqueConflictCounter.increment();
-                throw new PromiseMemberKeyConflictException(
-                        BaseErrorCode.PROMISE_MEMBER_KEY_CONFLICT,
-                        "[ERROR] encUser duplicate mismatch: promiseId=" + request.promiseId() + ", lookupId=" + maskLookupId(request.lookupId())
-                );
-            }
+            // 레거시 경로(encUserId)로 이미 참여한 경우에도 lookup 컬럼만 보강하고 idempotent 성공 처리한다.
             existingEncUserRecord.updateLookupInfo(request.lookupId(), request.lookupVersion());
             return new JoinPromise1Response(promise.getTitle() + " 약속에 참여하였습니다.");
         }
@@ -338,13 +325,23 @@ public class PromiseManageInfoService {
         String encPromiseKey = promiseShareKeyRepository
                 .findEncPromiseKeyByLookup(promiseId, lookupId, lookupVersion)
                 .orElseGet(() -> {
-                    if (!promiseKeyFallbackEnabled || encUserId == null || encUserId.isBlank()) {
+                    if (!promiseKeyFallbackEnabled) {
                         return null;
                     }
-                    String fallbackKey = promiseShareKeyRepository.findEncPromiseKey(promiseId, encUserId).orElse(null);
+                    String fallbackKey = null;
+                    if (encUserId != null && !encUserId.isBlank()) {
+                        fallbackKey = promiseShareKeyRepository.findEncPromiseKey(promiseId, encUserId).orElse(null);
+                    }
+                    if (fallbackKey == null) {
+                        fallbackKey = promiseShareKeyRepository
+                                .findFirstByPromiseIdAndUserId(promiseId, userId)
+                                .map(PromiseShareKey::getEncPromiseKey)
+                                .orElse(null);
+                    }
                     if (fallbackKey != null) {
                         promiseKeyLookupFallbackCounter.increment();
-                        log.info("promisekey2 fallback hit: promiseId={}, lookupId={}", promiseId, maskLookupId(lookupId));
+                        log.info("promisekey2 fallback hit: promiseId={}, lookupId={}, by={}",
+                                promiseId, maskLookupId(lookupId), (encUserId != null && !encUserId.isBlank()) ? "encUserId" : "userId");
                     }
                     return fallbackKey;
                 });

@@ -71,6 +71,8 @@ public interface PromiseShareKeyRepository extends JpaRepository<PromiseShareKey
 
     boolean existsByPromiseIdAndEncUserId(String promiseId, String encUserId);
 
+    Optional<PromiseShareKey> findFirstByPromiseIdAndUserId(String promiseId, String userId);
+
     @Modifying
     @Query("DELETE FROM PromiseShareKey p WHERE p.promiseId = :promiseId")
     void deleteAllByEncPromiseId(@Param("promiseId") String promiseId);

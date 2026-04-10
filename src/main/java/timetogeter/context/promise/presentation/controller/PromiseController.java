@@ -286,10 +286,22 @@ public class PromiseController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "enc_promise_key 조회 성공",
                     content = @Content(schema = @Schema(implementation = GetPromiseKey2.class))),
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류(lookupId/lookupVersion 검증 실패 등)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{ \"code\": 400, \"message\": \"잘못된 URL 요청이에요. 요청 포맷을 확인해주세요\" }")
+                    )),
             @ApiResponse(responseCode = "403", description = "권한 없음",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{ \"code\": 403, \"message\": \"접근 권한이 없어요\" }")
+                    )),
             @ApiResponse(responseCode = "404", description = "약속 또는 약속키 없음",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{ \"code\": 404, \"message\": \"약속을 찾을 수 없어요\" }")
+                    )),
+            @ApiResponse(responseCode = "409", description = "데이터 충돌(향후 deterministic fingerprint 도입 시 사용)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{ \"code\": 409, \"message\": \"약속키 데이터가 일치하지 않아요\" }")
+                    )),
             @ApiResponse(responseCode = "401", description = "인증 실패",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = "{ \"code\": 401, \"message\": \"인증이 필요합니다.\" }")
