@@ -23,4 +23,22 @@ public class PromiseExceptionHandler {
         log.error("PromiseExceptionHandler.handle_PromiseNotFoundException <{}> {}", e.getMessage(), e);
         return ErrorResponse.of(e.getStatus());
     }
+
+    @ExceptionHandler(PromiseLookupValidationException.class)
+    public ResponseEntity<ErrorResponse> handle_PromiseLookupValidationException(PromiseLookupValidationException e) {
+        log.error("PromiseExceptionHandler.handle_PromiseLookupValidationException <{}> {}", e.getMessage(), e);
+        return ErrorResponse.of(e.getStatus());
+    }
+
+    @ExceptionHandler(PromiseLookupForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handle_PromiseLookupForbiddenException(PromiseLookupForbiddenException e) {
+        log.error("PromiseExceptionHandler.handle_PromiseLookupForbiddenException <{}> {}", e.getMessage(), e);
+        return ErrorResponse.of(e.getStatus());
+    }
+
+    @ExceptionHandler(PromiseMemberKeyConflictException.class)
+    public ResponseEntity<ErrorResponse> handle_PromiseMemberKeyConflictException(PromiseMemberKeyConflictException e) {
+        log.error("PromiseExceptionHandler.handle_PromiseMemberKeyConflictException <{}> {}", e.getMessage(), e);
+        return ErrorResponse.of(e.getStatus());
+    }
 }

@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -122,8 +123,8 @@ public class PromiseManageController {
         사용자가 약속에 참여합니다.
 
         - 요청: 사용자 인증 (UserPrincipal) + JoinPromise1Request
-        - 처리: 참여 횟수 확인 후 참여 처리
-        - 예외: 참여 횟수가 5회를 초과하면 JoinLimitExceededException 발생
+        - 처리: 기존 암호문 저장 + lookupId/lookupVersion 기반 참여키 저장
+        - 예외: 동일 lookup에 다른 encPromiseKey 요청 시 409
         """
 )
 @ApiResponses({
@@ -134,6 +135,16 @@ public class PromiseManageController {
                         schema = @Schema(implementation = JoinPromise1Response.class),
                         examples = @ExampleObject(value = """
                             { "message": "약속에 참여하였습니다." }
+                        """)
+                )
+        ),
+        @ApiResponse(
+                responseCode = "409",
+                description = "기존 참여 데이터와 키 불일치",
+                content = @Content(
+                        schema = @Schema(implementation = BaseResponse.class),
+                        examples = @ExampleObject(value = """
+                            { "code": 409, "message": "약속키 데이터가 일치하지 않아요" }
                         """)
                 )
         ),
@@ -172,7 +183,7 @@ public class PromiseManageController {
     @PostMapping(value = "/join1", produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<JoinPromise1Response> joinPromise1(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody JoinPromise1Request request) throws Exception{
+            @RequestBody @Valid JoinPromise1Request request) throws Exception{
         String userId = userPrincipal.getId();
         JoinPromise1Response response = promiseManageInfoService.joinPromise1(userId, request);
         return new BaseResponse<>(response);

@@ -45,6 +45,8 @@ public enum BaseErrorCode implements StatusCode {
 
     PROMISE_NOT_FOUND(404, HttpStatus.NOT_FOUND, "약속을 찾을 수 없어요"),
     PROMISE_MANGER_FORBIDDEN(403, HttpStatus.FORBIDDEN, "약속장에 대한 접근 권한이 없어요"),
+    PROMISE_LOOKUP_FORBIDDEN(403, HttpStatus.FORBIDDEN, "접근 권한이 없어요"),
+    PROMISE_MEMBER_KEY_CONFLICT(409, HttpStatus.CONFLICT, "약속키 데이터가 일치하지 않아요"),
     VOTE_NUM_MAX(400, HttpStatus.BAD_REQUEST, "더이상 투표할 수 없어요"),
     PAGE_NOT_FOUND(400, HttpStatus.BAD_REQUEST, "총 페이지를 초과한 요청이에요"),
     INVALID_VOTE(403, HttpStatus.FORBIDDEN, "투표 취소권한이 없어요"),

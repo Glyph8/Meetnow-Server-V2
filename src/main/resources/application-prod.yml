@@ -98,3 +98,7 @@ cloud:
 
 server:
   port: 8080
+
+promise:
+  promisekey2:
+    fallback-enabled: true

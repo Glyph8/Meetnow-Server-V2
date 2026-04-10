@@ -1,0 +1,3 @@
+-- 2차 배포: fallback 종료 판단 시점에 실행할 정리 스크립트(placeholder)
+-- - promisekey2 fallback 조회 코드 제거 시점에 구 조회 경로 의존성 점검
+-- - 기존 (promise_id, enc_user_id) 유니크 제약은 3차 배포 직전까지 유지
