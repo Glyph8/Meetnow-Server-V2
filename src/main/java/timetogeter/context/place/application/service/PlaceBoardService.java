@@ -90,7 +90,7 @@ public class PlaceBoardService { // TODO: 장소 관리 시스템
         }else{
             placeId = aiPlaceId;
         }
-        promiseConfirmService.confirmPromisePlace(promiseId, aiPlaceId);
+        promiseConfirmService.confirmPromisePlace(promiseId, placeId);
         return promiseConfirmService.confirmedScheduleByPlace(promiseId, placeId);
     }
 
