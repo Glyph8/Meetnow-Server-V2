@@ -310,10 +310,21 @@ public class PromiseManageInfoService {
                         "[ERROR]: promiseId=" + promiseId + "에 해당하는 약속이 없습니다."
                 ));
 
-        boolean hasPermission = promiseShareKeyRepository.existsByPromiseIdAndUserId(promiseId, userId)
-                || promise.getManagerId().equals(userId)
-                || (encUserId != null && promiseShareKeyRepository.existsByPromiseIdAndEncUserId(promiseId, encUserId));
+        boolean isManager = promise.getManagerId().equals(userId);
+        boolean hasUserPermission = promiseShareKeyRepository.existsByPromiseIdAndUserId(promiseId, userId);
+        boolean hasEncUserPermission = encUserId != null
+                && !encUserId.isBlank()
+                && promiseShareKeyRepository.existsByPromiseIdAndEncUserId(promiseId, encUserId);
 
+        if (!isManager && !hasUserPermission && (encUserId == null || encUserId.isBlank())) {
+            throw new PromiseLookupValidationException(
+                    BaseErrorCode.BAD_REQUEST,
+                    "[ERROR]: encUserId is required for promisekey2 lookup during migration fallback. promiseId="
+                            + promiseId + ", userId=" + userId + ", lookupId=" + maskLookupId(lookupId)
+            );
+        }
+
+        boolean hasPermission = isManager || hasUserPermission || hasEncUserPermission;
         if (!hasPermission) {
             throw new PromiseLookupForbiddenException(
                     BaseErrorCode.PROMISE_LOOKUP_FORBIDDEN,
