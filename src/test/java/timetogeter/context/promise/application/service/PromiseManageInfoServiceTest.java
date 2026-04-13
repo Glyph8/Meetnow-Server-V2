@@ -56,10 +56,12 @@ class PromiseManageInfoServiceTest {
     @Mock
     private EmailService emailService;
 
+    private SimpleMeterRegistry meterRegistry;
     private PromiseManageInfoService service;
 
     @BeforeEach
     void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
         service = new PromiseManageInfoService(
                 groupProxyUserRepository,
                 groupShareKeyRepository,
@@ -70,7 +72,7 @@ class PromiseManageInfoServiceTest {
                 userRepository,
                 redisTemplate,
                 emailService,
-                new SimpleMeterRegistry()
+                meterRegistry
         );
     }
 
@@ -170,5 +172,6 @@ class PromiseManageInfoServiceTest {
                 "promise-1", "enc-promise-id", "enc-promise-member-id", "enc-user", "new-key", "a".repeat(64), 1
         );
         assertThrows(PromiseMemberKeyConflictException.class, () -> service.joinPromise1("user-1", request));
+        assertThat(meterRegistry.counter("join.lookup.unique.conflict.count").count()).isEqualTo(1.0d);
     }
 }

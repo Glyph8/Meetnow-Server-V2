@@ -44,6 +44,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -241,7 +242,7 @@ public class PromiseManageInfoService {
                 .orElse(null);
 
         if (existingLookupRecord != null) {
-            if (!existingLookupRecord.getEncPromiseKey().equals(request.encPromiseKey())) {
+            if (!Objects.equals(existingLookupRecord.getEncPromiseKey(), request.encPromiseKey())) {
                 joinLookupUniqueConflictCounter.increment();
                 throw new PromiseMemberKeyConflictException(
                         BaseErrorCode.PROMISE_MEMBER_KEY_CONFLICT,
