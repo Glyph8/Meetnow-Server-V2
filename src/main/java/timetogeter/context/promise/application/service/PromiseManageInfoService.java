@@ -35,6 +35,7 @@ import timetogeter.context.promise.domain.entity.PromiseShareKey;
 import timetogeter.context.promise.domain.repository.PromiseShareKeyRepository;
 import timetogeter.context.promise.exception.PromiseLookupForbiddenException;
 import timetogeter.context.promise.exception.PromiseLookupValidationException;
+import timetogeter.context.promise.exception.PromiseMemberKeyConflictException;
 import timetogeter.context.promise.exception.PromiseNotFoundException;
 import timetogeter.global.interceptor.response.error.status.BaseErrorCode;
 import timetogeter.global.mail.EmailService;
@@ -240,7 +241,16 @@ public class PromiseManageInfoService {
                 .orElse(null);
 
         if (existingLookupRecord != null) {
-            // AES-GCM 랜덤 IV 특성상 암호문 문자열 비교로 평문 동일성을 판정할 수 없어 중복 lookup 요청은 idempotent 성공 처리한다.
+            if (!existingLookupRecord.getEncPromiseKey().equals(request.encPromiseKey())) {
+                joinLookupUniqueConflictCounter.increment();
+                throw new PromiseMemberKeyConflictException(
+                        BaseErrorCode.PROMISE_MEMBER_KEY_CONFLICT,
+                        "[ERROR] promise share key mismatch. promiseId=" + request.promiseId()
+                                + ", lookupId=" + maskLookupId(request.lookupId())
+                                + ", lookupVersion=" + request.lookupVersion()
+                );
+            }
+
             return new JoinPromise1Response(promise.getTitle() + " 약속에 참여하였습니다.");
         }
 
