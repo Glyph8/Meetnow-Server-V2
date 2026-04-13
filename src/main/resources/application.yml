@@ -28,3 +28,7 @@ springdoc:
         url: /v3/api-docs
       #- name: REST Docs (Generated)
       #  url: /docs/openapi3.json
+
+promise:
+  promisekey2:
+    fallback-enabled: true

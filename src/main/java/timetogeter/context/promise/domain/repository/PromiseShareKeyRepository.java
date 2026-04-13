@@ -50,6 +50,29 @@ public interface PromiseShareKeyRepository extends JpaRepository<PromiseShareKey
     Optional<String> findEncPromiseKey(@Param("promiseId") String promiseId,
                                        @Param("encUserId") String encUserId);
 
+    @Query(value = "SELECT enc_promise_key " +
+            "FROM promise_share_key " +
+            "WHERE promise_id = :promiseId AND lookup_id = :lookupId AND lookup_version = :lookupVersion",
+            nativeQuery = true)
+    Optional<String> findEncPromiseKeyByLookup(@Param("promiseId") String promiseId,
+                                               @Param("lookupId") String lookupId,
+                                               @Param("lookupVersion") Integer lookupVersion);
+
+    @Query(value = "SELECT * FROM promise_share_key " +
+            "WHERE promise_id = :promiseId AND lookup_id = :lookupId AND lookup_version = :lookupVersion",
+            nativeQuery = true)
+    Optional<PromiseShareKey> findByPromiseIdAndLookup(@Param("promiseId") String promiseId,
+                                                       @Param("lookupId") String lookupId,
+                                                       @Param("lookupVersion") Integer lookupVersion);
+
+    Optional<PromiseShareKey> findByPromiseIdAndEncUserId(String promiseId, String encUserId);
+
+    boolean existsByPromiseIdAndUserId(String promiseId, String userId);
+
+    boolean existsByPromiseIdAndEncUserId(String promiseId, String encUserId);
+
+    Optional<PromiseShareKey> findFirstByPromiseIdAndUserId(String promiseId, String userId);
+
     @Modifying
     @Query("DELETE FROM PromiseShareKey p WHERE p.promiseId = :promiseId")
     void deleteAllByEncPromiseId(@Param("promiseId") String promiseId);

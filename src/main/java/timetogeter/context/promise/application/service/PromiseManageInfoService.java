@@ -1,8 +1,10 @@
 package timetogeter.context.promise.application.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import timetogeter.context.auth.domain.repository.UserRepository;
@@ -31,6 +33,9 @@ import timetogeter.context.promise.domain.repository.PromiseProxyUserRepository;
 import timetogeter.context.promise.domain.repository.PromiseRepository;
 import timetogeter.context.promise.domain.entity.PromiseShareKey;
 import timetogeter.context.promise.domain.repository.PromiseShareKeyRepository;
+import timetogeter.context.promise.exception.PromiseLookupForbiddenException;
+import timetogeter.context.promise.exception.PromiseLookupValidationException;
+import timetogeter.context.promise.exception.PromiseMemberKeyConflictException;
 import timetogeter.context.promise.exception.PromiseNotFoundException;
 import timetogeter.global.interceptor.response.error.status.BaseErrorCode;
 import timetogeter.global.mail.EmailService;
@@ -39,13 +44,17 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 @Slf4j
 public class PromiseManageInfoService {
+    // lookupId 는 클라이언트가 전달하는 64자리 소문자 hex 인덱스 키만 허용한다.
+    private static final Pattern LOOKUP_ID_PATTERN = Pattern.compile("^[0-9a-f]{64}$");
+    private static final int LOOKUP_VERSION_V1 = 1;
 
     private final GroupProxyUserRepository groupProxyUserRepository;
     private final GroupShareKeyRepository groupShareKeyRepository;
@@ -59,6 +68,40 @@ public class PromiseManageInfoService {
 
     private final StringRedisTemplate redisTemplate;
     private final EmailService emailService;
+    private final Counter promiseKeyLookupSuccessCounter;
+    private final Counter promiseKeyLookupFallbackCounter;
+    private final Counter joinLookupUniqueConflictCounter;
+    private final Counter promiseKeyNotFoundCounter;
+
+    @Value("${promise.promisekey2.fallback-enabled:true}")
+    private boolean promiseKeyFallbackEnabled;
+
+    public PromiseManageInfoService(
+            GroupProxyUserRepository groupProxyUserRepository,
+            GroupShareKeyRepository groupShareKeyRepository,
+            GroupRepository groupRepository,
+            PromiseRepository promiseRepository,
+            PromiseProxyUserRepository promiseProxyUserRepository,
+            PromiseShareKeyRepository promiseShareKeyRepository,
+            UserRepository userRepository,
+            StringRedisTemplate redisTemplate,
+            EmailService emailService,
+            MeterRegistry meterRegistry
+    ) {
+        this.groupProxyUserRepository = groupProxyUserRepository;
+        this.groupShareKeyRepository = groupShareKeyRepository;
+        this.groupRepository = groupRepository;
+        this.promiseRepository = promiseRepository;
+        this.promiseProxyUserRepository = promiseProxyUserRepository;
+        this.promiseShareKeyRepository = promiseShareKeyRepository;
+        this.userRepository = userRepository;
+        this.redisTemplate = redisTemplate;
+        this.emailService = emailService;
+        this.promiseKeyLookupSuccessCounter = Counter.builder("promisekey2.lookup.success.rate").register(meterRegistry);
+        this.promiseKeyLookupFallbackCounter = Counter.builder("promisekey2.lookup.fallback.rate").register(meterRegistry);
+        this.joinLookupUniqueConflictCounter = Counter.builder("join.lookup.unique_conflict.count").register(meterRegistry);
+        this.promiseKeyNotFoundCounter = Counter.builder("promisekey2.not_found.count").register(meterRegistry);
+    }
 
 
     //약속 만들기 - 기본 정보 입력 Step1 - 메인 서비스 메소드
@@ -187,16 +230,46 @@ public class PromiseManageInfoService {
     //약속 만들기 - 참여하기 Step1 - 메인 서비스 메소드
     @Transactional
     public JoinPromise1Response joinPromise1(String userId, JoinPromise1Request request) {
-        //약속을 만든 userId 사용자를 PromiseProxyUser 테이블에 저장
-        //약속을 만든 userId 사용자를 PromiseShareKey 테이블에 저장
-        saveCreatorToPromiseTables(userId, request);
+        validateLookup(request.lookupId(), request.lookupVersion());
 
         Promise promise = promiseRepository.findById(request.promiseId())
                 .orElseThrow(() -> new PromiseNotFoundException(BaseErrorCode.PROMISE_NOT_FOUND,
                         "promiseId=" + request.promiseId() + " 약속을 찾을 수 없습니다"
                 ));
 
-        //약속 참여자 수 증가 
+        PromiseShareKey existingLookupRecord = promiseShareKeyRepository
+                .findByPromiseIdAndLookup(request.promiseId(), request.lookupId(), request.lookupVersion())
+                .orElse(null);
+
+        if (existingLookupRecord != null) {
+            if (!Objects.equals(existingLookupRecord.getEncPromiseKey(), request.encPromiseKey())) {
+                joinLookupUniqueConflictCounter.increment();
+                throw new PromiseMemberKeyConflictException(
+                        BaseErrorCode.PROMISE_MEMBER_KEY_CONFLICT,
+                        "[ERROR] promise share key mismatch. promiseId=" + request.promiseId()
+                                + ", lookupId=" + maskLookupId(request.lookupId())
+                                + ", lookupVersion=" + request.lookupVersion()
+                );
+            }
+
+            return new JoinPromise1Response(promise.getTitle() + " 약속에 참여하였습니다.");
+        }
+
+        PromiseShareKey existingEncUserRecord = promiseShareKeyRepository
+                .findByPromiseIdAndEncUserId(request.promiseId(), request.encUserId())
+                .orElse(null);
+
+        if (existingEncUserRecord != null) {
+            // 레거시 경로(encUserId)로 이미 참여한 경우에도 lookup 컬럼만 보강하고 idempotent 성공 처리한다.
+            existingEncUserRecord.updateLookupInfo(request.lookupId(), request.lookupVersion());
+            return new JoinPromise1Response(promise.getTitle() + " 약속에 참여하였습니다.");
+        }
+
+        //약속을 만든 userId 사용자를 PromiseProxyUser 테이블에 저장
+        //약속을 만든 userId 사용자를 PromiseShareKey 테이블에 저장
+        saveCreatorToPromiseTables(userId, request);
+
+        //약속 참여자 수 증가
         promise.incrementNum();
         promiseRepository.save(promise);
 
@@ -218,9 +291,12 @@ public class PromiseManageInfoService {
         // PromiseShareKey 저장
         promiseShareKeyRepository.save(PromiseShareKey.of(
                 request.promiseId(),
+                userId,
                 request.encUserId(),
                 request.encPromiseKey(),
-                UUID.randomUUID().toString()
+                UUID.randomUUID().toString(),
+                request.lookupId(),
+                request.lookupVersion()
         ));
     }
 
@@ -233,16 +309,101 @@ public class PromiseManageInfoService {
     //promisekey를 획득하는 과정 - 메인 메소드(2)
     public GetPromiseKey2 getPromiseKey2(String userId, GetPromiseRequest request) {
         String promiseId = request.promiseId();
+        String lookupId = request.lookupId();
+        Integer lookupVersion = request.lookupVersion();
         String encUserId = request.encUserId();
 
+        validateLookup(lookupId, lookupVersion);
 
-        // promiseId와 encUserId로 encPromiseKey 조회
-        String encPromiseKey = promiseShareKeyRepository.findEncPromiseKey(promiseId, encUserId)
+        Promise promise = promiseRepository.findById(promiseId)
                 .orElseThrow(() -> new PromiseNotFoundException(
                         BaseErrorCode.PROMISE_NOT_FOUND,
-                        "[ERROR]: promiseId=" + promiseId + ", encUserId=" + encUserId + "에 해당하는 encPromiseKey를 찾을 수 없습니다."
+                        "[ERROR]: promiseId=" + promiseId + "에 해당하는 약속이 없습니다."
                 ));
 
+        boolean isManager = promise.getManagerId().equals(userId);
+        boolean hasUserPermission = promiseShareKeyRepository.existsByPromiseIdAndUserId(promiseId, userId);
+        boolean hasEncUserPermission = encUserId != null
+                && !encUserId.isBlank()
+                && promiseShareKeyRepository.existsByPromiseIdAndEncUserId(promiseId, encUserId);
+
+        if (!isManager && !hasUserPermission && (encUserId == null || encUserId.isBlank())) {
+            throw new PromiseLookupValidationException(
+                    BaseErrorCode.BAD_REQUEST,
+                    "[ERROR]: encUserId is required for promisekey2 lookup during migration fallback. promiseId="
+                            + promiseId + ", userId=" + userId + ", lookupId=" + maskLookupId(lookupId)
+            );
+        }
+
+        boolean hasPermission = isManager || hasUserPermission || hasEncUserPermission;
+        if (!hasPermission) {
+            throw new PromiseLookupForbiddenException(
+                    BaseErrorCode.PROMISE_LOOKUP_FORBIDDEN,
+                    "[ERROR]: unauthorized promisekey2 lookup. promiseId=" + promiseId + ", userId=" + userId + ", lookupId=" + maskLookupId(lookupId)
+            );
+        }
+
+
+        String encPromiseKey = promiseShareKeyRepository
+                .findEncPromiseKeyByLookup(promiseId, lookupId, lookupVersion)
+                .orElseGet(() -> {
+                    if (!promiseKeyFallbackEnabled) {
+                        return null;
+                    }
+                    String fallbackKey = null;
+                    if (encUserId != null && !encUserId.isBlank()) {
+                        fallbackKey = promiseShareKeyRepository.findEncPromiseKey(promiseId, encUserId).orElse(null);
+                    }
+                    if (fallbackKey == null) {
+                        fallbackKey = promiseShareKeyRepository
+                                .findFirstByPromiseIdAndUserId(promiseId, userId)
+                                .map(PromiseShareKey::getEncPromiseKey)
+                                .orElse(null);
+                    }
+                    if (fallbackKey != null) {
+                        promiseKeyLookupFallbackCounter.increment();
+                        log.info("promisekey2 fallback hit: promiseId={}, lookupId={}, by={}",
+                                promiseId, maskLookupId(lookupId), (encUserId != null && !encUserId.isBlank()) ? "encUserId" : "userId");
+                    }
+                    return fallbackKey;
+                });
+
+        if (encPromiseKey == null) {
+            promiseKeyNotFoundCounter.increment();
+            throw new PromiseNotFoundException(
+                    BaseErrorCode.PROMISE_NOT_FOUND,
+                    "[ERROR]: promiseId=" + promiseId + ", lookupId=" + maskLookupId(lookupId) + "에 해당하는 encPromiseKey를 찾을 수 없습니다."
+            );
+        }
+
+        promiseKeyLookupSuccessCounter.increment();
+
         return new GetPromiseKey2(encPromiseKey);
+    }
+
+    private void validateLookup(String lookupId, Integer lookupVersion) {
+        if (lookupVersion == null || lookupVersion != LOOKUP_VERSION_V1) {
+            throw new PromiseLookupValidationException(
+                    BaseErrorCode.BAD_REQUEST,
+                    "[ERROR]: invalid lookupVersion=" + lookupVersion
+            );
+        }
+        if (lookupId == null || !LOOKUP_ID_PATTERN.matcher(lookupId).matches()) {
+            throw new PromiseLookupValidationException(
+                    BaseErrorCode.BAD_REQUEST,
+                    "[ERROR]: invalid lookupId format"
+            );
+        }
+    }
+
+    private String maskLookupId(String lookupId) {
+        if (lookupId == null || lookupId.isBlank()) {
+            return "********";
+        }
+        if (lookupId.length() < 8) {
+            return "********";
+        }
+        String prefix = lookupId.substring(0, 8);
+        return prefix + "****";
     }
 }
