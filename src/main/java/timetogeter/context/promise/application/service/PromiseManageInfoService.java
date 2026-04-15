@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import timetogeter.context.auth.domain.repository.UserRepository;
 import timetogeter.context.auth.exception.UserNotFoundException;
+import timetogeter.context.group.application.support.GroupLookupSupport;
 import timetogeter.context.group.exception.GroupIdNotFoundException;
 import timetogeter.context.group.exception.GroupProxyUserNotFoundException;
 import timetogeter.context.group.exception.GroupShareKeyNotFoundException;
@@ -112,22 +113,19 @@ public class PromiseManageInfoService {
         String lookupId = request.lookupId();
         Integer lookupVersion = request.lookupVersion();
 
-        boolean hasLookup = lookupId != null && !lookupId.isBlank() && lookupVersion != null;
-        GroupProxyUser groupProxyUserFound;
-        if (hasLookup) {
-            if (groupId == null || groupId.isBlank()) {
-                throw new PromiseLookupValidationException(
-                        BaseErrorCode.BAD_REQUEST,
-                        "[ERROR]: groupId is required for lookup-based group proxy query"
-                );
-            }
-            validateLookup(lookupId, lookupVersion);
-            groupProxyUserFound = groupProxyUserRepository
-                    .findByUserIdAndGroupIdAndLookup(userId, groupId, lookupId, lookupVersion)
-                    .orElseGet(() -> findGroupProxyByLegacyEncGroupId(userId, encGroupId));
-        } else {
-            groupProxyUserFound = findGroupProxyByLegacyEncGroupId(userId, encGroupId);
-        }
+        GroupProxyUser groupProxyUserFound = GroupLookupSupport
+                .findGroupProxyUserWithFallback(
+                        groupProxyUserRepository,
+                        userId,
+                        groupId,
+                        lookupId,
+                        lookupVersion,
+                        encGroupId
+                )
+                .orElseThrow(() -> new GroupProxyUserNotFoundException(
+                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                        "[ERROR]: 해당 유저의 그룹 프록시 정보가 없습니다."
+                ));
 
         /*
         '개인키로 암호화된 그룹 아이디'-> encGroupId
@@ -137,20 +135,6 @@ public class PromiseManageInfoService {
                 groupProxyUserFound.getEncGroupId(),
                 groupProxyUserFound.getEncGroupMemberId()
         );
-    }
-
-    private GroupProxyUser findGroupProxyByLegacyEncGroupId(String userId, String encGroupId) {
-        if (encGroupId == null || encGroupId.isBlank()) {
-            throw new GroupProxyUserNotFoundException(
-                    BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
-                    "[ERROR]: lookup 기반 조회 실패 및 encGroupId fallback 입력값이 없습니다."
-            );
-        }
-        return groupProxyUserRepository.findByUserIdAndEncGroupId(userId, encGroupId)
-                .orElseThrow(() -> new GroupProxyUserNotFoundException(
-                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
-                        "[ERROR]: 해당 유저의 그룹 프록시 정보가 없습니다."
-                ));
     }
 
     //약속 만들기 - 기본 정보 입력 Step2 - 메인 서비스 메소드
