@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 public final class GroupLookupSupport {
@@ -38,7 +39,8 @@ public final class GroupLookupSupport {
             Integer lookupVersion,
             String encGroupId
     ) {
-        if (hasLookup(lookupId, lookupVersion)) {
+        boolean hasLookup = hasLookup(lookupId, lookupVersion);
+        if (hasLookup) {
             if (groupId == null || groupId.isBlank()) {
                 throw new GroupLookupValidationException(
                         BaseErrorCode.BAD_REQUEST,
@@ -50,6 +52,9 @@ public final class GroupLookupSupport {
             if (byLookup.isPresent()) {
                 return byLookup;
             }
+            if (encGroupId == null || encGroupId.isBlank()) {
+                return Optional.empty();
+            }
         }
 
         if (encGroupId == null || encGroupId.isBlank()) {
@@ -59,6 +64,25 @@ public final class GroupLookupSupport {
             );
         }
         return repository.findByUserIdAndEncGroupId(userId, encGroupId);
+    }
+
+    public static GroupProxyUser findGroupProxyUserWithFallbackOrThrow(
+            GroupProxyUserRepository repository,
+            String userId,
+            String groupId,
+            String lookupId,
+            Integer lookupVersion,
+            String encGroupId,
+            Supplier<? extends RuntimeException> notFoundExceptionSupplier
+    ) {
+        return findGroupProxyUserWithFallback(
+                repository,
+                userId,
+                groupId,
+                lookupId,
+                lookupVersion,
+                encGroupId
+        ).orElseThrow(notFoundExceptionSupplier);
     }
 
     public static void validateLookup(String lookupId, Integer lookupVersion) {

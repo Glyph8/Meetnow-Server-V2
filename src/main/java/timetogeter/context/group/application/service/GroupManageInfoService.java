@@ -109,39 +109,22 @@ public class GroupManageInfoService {
                 .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND, "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
         groupFound.update(request);
 
-        GroupProxyUser groupProxyUser = findGroupProxyUserWithFallback(
+        GroupProxyUser groupProxyUser = GroupLookupSupport.findGroupProxyUserWithFallbackOrThrow(
+                groupProxyUserRepository,
                 managerId,
                 groupId,
                 request.lookupId(),
                 request.lookupVersion(),
-                request.encGroupId()
+                request.encGroupId(),
+                () -> new GroupProxyUserNotFoundException(
+                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                        "[ERROR]: 해당 유저의 그룹 프록시 정보가 없습니다."
+                )
         );
         String encEncGroupMemberId = groupProxyUser.getEncGroupMemberId();
 
         return new EditGroup1Response(encEncGroupMemberId);
 
-    }
-
-    private GroupProxyUser findGroupProxyUserWithFallback(
-            String userId,
-            String groupId,
-            String lookupId,
-            Integer lookupVersion,
-            String encGroupId
-    ) {
-        return GroupLookupSupport
-                .findGroupProxyUserWithFallback(
-                        groupProxyUserRepository,
-                        userId,
-                        groupId,
-                        lookupId,
-                        lookupVersion,
-                        encGroupId
-                )
-                .orElseThrow(() -> new GroupProxyUserNotFoundException(
-                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
-                        "[ERROR]: 해당 유저의 그룹 프록시 정보가 없습니다."
-                ));
     }
 
     //그룹 상세 - 그룹 정보 수정 - step2 - 메인 서비스 메소드

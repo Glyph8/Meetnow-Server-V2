@@ -76,12 +76,17 @@ public class GroupManageMemberService {
     @Transactional
     public InviteGroup1Response inviteGroup1(InviteGroup1Request request,String userId) {
         String groupId = request.groupId();
-        GroupProxyUser groupProxyUser = findGroupProxyUserWithFallback(
+        GroupProxyUser groupProxyUser = GroupLookupSupport.findGroupProxyUserWithFallbackOrThrow(
+                groupProxyUserRepository,
                 userId,
                 groupId,
                 request.lookupId(),
                 request.lookupVersion(),
-                request.encGroupId()
+                request.encGroupId(),
+                () -> new GroupProxyUserNotFoundException(
+                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                        "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
+                )
         );
         String encEncGroupMemberId = groupProxyUser.getEncGroupMemberId();
 
@@ -301,12 +306,17 @@ public class GroupManageMemberService {
 
     //그룹 관리 - 그룹 나가기 - step1 - 메인 서비스 메소드
     public LeaveGroup1Response leaveGroup1(LeavGroup1Request request, String userID) {
-        GroupProxyUser groupProxyUser = findGroupProxyUserWithFallback(
+        GroupProxyUser groupProxyUser = GroupLookupSupport.findGroupProxyUserWithFallbackOrThrow(
+                groupProxyUserRepository,
                 userID,
                 request.groupId(),
                 request.lookupId(),
                 request.lookupVersion(),
-                request.encGroupId()
+                request.encGroupId(),
+                () -> new GroupProxyUserNotFoundException(
+                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                        "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
+                )
         );
 
         Group group = groupRepository.findByGroupId(request.groupId())
@@ -320,39 +330,22 @@ public class GroupManageMemberService {
 
     //그룹 관리 - 그룹 나가기 - step2 - 메인 서비스 메소드
     public LeaveGroup2Response leaveGroup2(LeaveGroup2Request request, String userId) {
-        GroupProxyUser groupProxyUser = findGroupProxyUserWithFallback(
+        GroupProxyUser groupProxyUser = GroupLookupSupport.findGroupProxyUserWithFallbackOrThrow(
+                groupProxyUserRepository,
                 userId,
                 request.groupId(),
                 request.lookupId(),
                 request.lookupVersion(),
-                request.encGroupId()
+                request.encGroupId(),
+                () -> new GroupProxyUserNotFoundException(
+                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                        "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
+                )
         );
 
         String encencGroupMemberId = groupProxyUser.getEncGroupMemberId();
 
         return new LeaveGroup2Response(encencGroupMemberId);
-    }
-
-    private GroupProxyUser findGroupProxyUserWithFallback(
-            String userId,
-            String groupId,
-            String lookupId,
-            Integer lookupVersion,
-            String encGroupId
-    ) {
-        return GroupLookupSupport
-                .findGroupProxyUserWithFallback(
-                        groupProxyUserRepository,
-                        userId,
-                        groupId,
-                        lookupId,
-                        lookupVersion,
-                        encGroupId
-                )
-                .orElseThrow(() -> new GroupProxyUserNotFoundException(
-                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
-                        "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
-                ));
     }
 
     //그룹 관리 - 그룹 나가기 - step3 - 메인 서비스 메소드
