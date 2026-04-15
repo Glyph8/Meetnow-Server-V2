@@ -46,4 +46,10 @@ public class GroupExceptionHandler {
         log.error("GroupExceptionHandler.handle_GroupNotFoundException <{}> {}", e.getMessage(), e);
         return ErrorResponse.of(e.getStatus());
     }
+
+    @ExceptionHandler(GroupLookupValidationException.class)
+    public ResponseEntity<ErrorResponse> handle_GroupLookupValidationException(GroupLookupValidationException e) {
+        log.error("GroupExceptionHandler.handle_GroupLookupValidationException <{}> {}", e.getMessage(), e);
+        return ErrorResponse.of(e.getStatus());
+    }
 }

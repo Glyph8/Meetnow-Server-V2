@@ -17,6 +17,7 @@ import timetogeter.context.group.application.dto.response.*;
 import timetogeter.global.mail.EmailService;
 import timetogeter.context.group.exception.GroupIdNotFoundException;
 import timetogeter.context.group.exception.GroupInviteCodeExpired;
+import timetogeter.context.group.exception.GroupLookupValidationException;
 import timetogeter.context.group.exception.GroupProxyUserNotFoundException;
 import timetogeter.context.group.exception.GroupShareKeyNotFoundException;
 import timetogeter.context.group.domain.entity.Group;
@@ -37,13 +38,17 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.security.NoSuchAlgorithmException;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @Slf4j
 public class GroupManageMemberService {
+    private static final int LOOKUP_VERSION_V1 = 1;
+    private static final Pattern LOOKUP_ID_PATTERN = Pattern.compile("^[0-9a-f]{64}$");
 
     @Autowired
     private AmazonS3 amazonS3;
@@ -76,10 +81,13 @@ public class GroupManageMemberService {
     @Transactional
     public InviteGroup1Response inviteGroup1(InviteGroup1Request request,String userId) {
         String groupId = request.groupId();
-        String encGroupId = request.encGroupId();
-
-        GroupProxyUser groupProxyUser = groupProxyUserRepository.findByUserIdAndEncGroupId(userId, encGroupId)
-                .orElseThrow(() -> new GroupProxyUserNotFoundException(BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND, "[ERROR]: 해당 그룹 프록시 정보가 없습니다."));
+        GroupProxyUser groupProxyUser = findGroupProxyUserWithFallback(
+                userId,
+                groupId,
+                request.lookupId(),
+                request.lookupVersion(),
+                request.encGroupId()
+        );
         String encEncGroupMemberId = groupProxyUser.getEncGroupMemberId();
 
         return new InviteGroup1Response(encEncGroupMemberId);
@@ -159,9 +167,18 @@ public class GroupManageMemberService {
         String encUserId = request.encUserId(); //그룹키로 암호화한 사용자 고유 아이디
         String encGroupId = request.encGroupId(); //개인키로 암호화한 그룹 아이디
         String encencGroupMemberId = request.encencGroupMemberId(); //개인키로 암호화한 encUserId
+        Lookup lookup = resolveLookupForWrite(request.lookupId(), request.lookupVersion(), userId, groupId);
 
         //GroupProxyUser에 저장
-        groupProxyUserRepository.save(GroupProxyUser.of(userId, encGroupId, encencGroupMemberId, System.currentTimeMillis()));
+        groupProxyUserRepository.save(GroupProxyUser.of(
+                userId,
+                groupId,
+                encGroupId,
+                lookup.lookupId(),
+                lookup.lookupVersion(),
+                encencGroupMemberId,
+                System.currentTimeMillis()
+        ));
 
         //GroupShareKey에 저장
         groupShareKeyRepository.save(GroupShareKey.of(groupId, encUserId, encGroupKey));
@@ -222,9 +239,18 @@ public class GroupManageMemberService {
         String encUserId = request.encUserId(); //그룹키로 암호화한 사용자 고유 아이디
         String encGroupId = request.encGroupId(); //개인키로 암호화한 그룹 아이디
         String encencGroupMemberId = request.encencGroupMemberId(); //개인키로 암호화한 encUserId
+        Lookup lookup = resolveLookupForWrite(request.lookupId(), request.lookupVersion(), userId, groupId);
 
         //GroupProxyUser에 저장
-        groupProxyUserRepository.save(GroupProxyUser.of(userId,encGroupId,encencGroupMemberId,System.currentTimeMillis()));
+        groupProxyUserRepository.save(GroupProxyUser.of(
+                userId,
+                groupId,
+                encGroupId,
+                lookup.lookupId(),
+                lookup.lookupVersion(),
+                encencGroupMemberId,
+                System.currentTimeMillis()
+        ));
 
         //GroupShareKey에 저장
         groupShareKeyRepository.save(GroupShareKey.of(groupId, encUserId, encGroupKey));
@@ -276,8 +302,13 @@ public class GroupManageMemberService {
 
     //그룹 관리 - 그룹 나가기 - step1 - 메인 서비스 메소드
     public LeaveGroup1Response leaveGroup1(LeavGroup1Request request, String userID) {
-        GroupProxyUser groupProxyUser = groupProxyUserRepository.findByEncGroupId(request.encGroupId())
-                .orElseThrow(() -> new GroupProxyUserNotFoundException(BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND, "[ERROR]: 해당 그룹 프록시 정보가 없습니다"));
+        GroupProxyUser groupProxyUser = findGroupProxyUserWithFallback(
+                userID,
+                request.groupId(),
+                request.lookupId(),
+                request.lookupVersion(),
+                request.encGroupId()
+        );
 
         Group group = groupRepository.findByGroupId(request.groupId())
                 .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND, "[ERROR]: 존재하지 않는 그룹입니다: "));
@@ -289,13 +320,99 @@ public class GroupManageMemberService {
     }
 
     //그룹 관리 - 그룹 나가기 - step2 - 메인 서비스 메소드
-    public LeaveGroup2Response leaveGroup2(LeaveGroup2Request request) {
-        GroupProxyUser groupProxyUser = groupProxyUserRepository.findByEncGroupId(request.encGroupId())
-                .orElseThrow(() -> new GroupProxyUserNotFoundException(BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND, "[ERROR]: 해당 그룹 프록시 정보가 없습니다"));
+    public LeaveGroup2Response leaveGroup2(LeaveGroup2Request request, String userId) {
+        GroupProxyUser groupProxyUser = findGroupProxyUserWithFallback(
+                userId,
+                request.groupId(),
+                request.lookupId(),
+                request.lookupVersion(),
+                request.encGroupId()
+        );
 
         String encencGroupMemberId = groupProxyUser.getEncGroupMemberId();
 
         return new LeaveGroup2Response(encencGroupMemberId);
+    }
+
+    private GroupProxyUser findGroupProxyUserWithFallback(
+            String userId,
+            String groupId,
+            String lookupId,
+            Integer lookupVersion,
+            String encGroupId
+    ) {
+        boolean hasLookup = lookupId != null && !lookupId.isBlank() && lookupVersion != null;
+        if (hasLookup) {
+            if (groupId == null || groupId.isBlank()) {
+                throw new GroupLookupValidationException(
+                        BaseErrorCode.BAD_REQUEST,
+                        "[ERROR]: groupId is required for lookup-based group proxy query"
+                );
+            }
+            validateLookup(lookupId, lookupVersion);
+            return groupProxyUserRepository
+                    .findByUserIdAndGroupIdAndLookup(userId, groupId, lookupId, lookupVersion)
+                    .orElseGet(() -> findByLegacyEncGroupId(userId, encGroupId));
+        }
+        return findByLegacyEncGroupId(userId, encGroupId);
+    }
+
+    private GroupProxyUser findByLegacyEncGroupId(String userId, String encGroupId) {
+        if (encGroupId == null || encGroupId.isBlank()) {
+            throw new GroupProxyUserNotFoundException(
+                    BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                    "[ERROR]: lookup 기반 조회 실패 및 encGroupId fallback 입력값이 없습니다."
+            );
+        }
+        return groupProxyUserRepository.findByUserIdAndEncGroupId(userId, encGroupId)
+                .orElseThrow(() -> new GroupProxyUserNotFoundException(
+                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                        "[ERROR]: 해당 그룹 프록시 정보가 없습니다"
+                ));
+    }
+
+    private Lookup resolveLookupForWrite(String lookupId, Integer lookupVersion, String userId, String groupId) {
+        if (lookupId == null || lookupId.isBlank() || lookupVersion == null) {
+            return new Lookup(generateLookupId(userId, groupId), LOOKUP_VERSION_V1);
+        }
+        validateLookup(lookupId, lookupVersion);
+        return new Lookup(lookupId, lookupVersion);
+    }
+
+    private void validateLookup(String lookupId, Integer lookupVersion) {
+        if (lookupVersion == null || lookupVersion != LOOKUP_VERSION_V1) {
+            throw new GroupLookupValidationException(
+                    BaseErrorCode.BAD_REQUEST,
+                    "[ERROR]: invalid group lookupVersion=" + lookupVersion
+            );
+        }
+        if (lookupId == null || !LOOKUP_ID_PATTERN.matcher(lookupId).matches()) {
+            throw new GroupLookupValidationException(
+                    BaseErrorCode.BAD_REQUEST,
+                    "[ERROR]: invalid group lookupId format"
+            );
+        }
+    }
+
+    private String generateLookupId(String userId, String groupId) {
+        try {
+            String key = userId + ":" + groupId;
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(key.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new GroupLookupValidationException(
+                    BaseErrorCode.INTERNAL_SERVER_ERROR,
+                    "[ERROR]: lookupId generation failed"
+            );
+        }
+    }
+
+    private record Lookup(String lookupId, Integer lookupVersion) {
     }
 
     //그룹 관리 - 그룹 나가기 - step3 - 메인 서비스 메소드

@@ -6,6 +6,8 @@ public record JoinGroupRequest(
         String encGroupId,
         String encGroupKey,
         String encUserId,
-        String encencGroupMemberId
+        String encencGroupMemberId,
+        String lookupId,
+        Integer lookupVersion
 ) {
 }

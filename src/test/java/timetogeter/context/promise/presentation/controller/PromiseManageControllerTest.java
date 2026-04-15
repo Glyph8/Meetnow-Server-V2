@@ -110,7 +110,10 @@ class PromiseManageControllerTest extends RestDocsSupport {
             );
 
             CreatePromise1Request request = new CreatePromise1Request(
-                    "21R517Z8ICrEK7vskd3gNq9yA1VWfEVgkx1hpjf8U+O8oS54tK16QepuIjRk8Rtm4XbYRA=="
+                    "group-1",
+                    "21R517Z8ICrEK7vskd3gNq9yA1VWfEVgkx1hpjf8U+O8oS54tK16QepuIjRk8Rtm4XbYRA==",
+                    "4f53cda18c2baa0c0354bb5f9a3ecbe5ed4f52f5f5c2f7f8052e8b6a85bf8d52",
+                    1
             );
             CreatePromise1Response response = new CreatePromise1Response(
                     "21R517Z8ICrEK7vskd3gNq9yA1VWfEVgkx1hpjf8U+O8oS54tK16QepuIjRk8Rtm4XbYRA==",

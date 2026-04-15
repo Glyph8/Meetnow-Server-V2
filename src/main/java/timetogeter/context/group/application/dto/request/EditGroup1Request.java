@@ -8,9 +8,14 @@ public record EditGroup1Request(
         @NotBlank(message = "groupId는 필수입니다.")
         String groupId,
 
-        @Schema(description = "암호화된 그룹 ID", example = "BASE64-encGroupId==", required = true)
-        @NotBlank(message = "encGroupId는 필수입니다.")
+        @Schema(description = "암호화된 그룹 ID(하위 호환 fallback용)", example = "BASE64-encGroupId==")
         String encGroupId,
+
+        @Schema(description = "조회 인덱스 식별자(64-char hex)", example = "4f53cda18c2baa0c0354bb5f9a3ecbe5ed4f52f5f5c2f7f8052e8b6a85bf8d52")
+        String lookupId,
+
+        @Schema(description = "조회 인덱스 버전(현재 1)", example = "1")
+        Integer lookupVersion,
 
         @Schema(description = "수정할 그룹 이름", example = "새 그룹명")
         String groupName,

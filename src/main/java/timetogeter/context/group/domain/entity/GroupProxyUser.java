@@ -19,22 +19,44 @@ public class GroupProxyUser {
     private String groupProxyId;
 
     private String userId;
+    private String groupId;
     private String encGroupId;
+    private String lookupId;
+    private Integer lookupVersion;
 
     @CreationTimestamp
     private LocalDateTime timestamp;
     private String encGroupMemberId;
 
-    private GroupProxyUser(String userId, String encGroupId, LocalDateTime timestamp, String encGroupMemberId) {
+    private GroupProxyUser(
+            String userId,
+            String groupId,
+            String encGroupId,
+            String lookupId,
+            Integer lookupVersion,
+            LocalDateTime timestamp,
+            String encGroupMemberId
+    ) {
         this.groupProxyId = UUID.randomUUID().toString();
         this.userId = userId;
+        this.groupId = groupId;
         this.encGroupId = encGroupId;
+        this.lookupId = lookupId;
+        this.lookupVersion = lookupVersion;
         this.timestamp = timestamp;
         this.encGroupMemberId = encGroupMemberId;
     }
 
-    public static GroupProxyUser of(String userId, String encGroupId, String encGroupMemberId, long timestampMillis) {
+    public static GroupProxyUser of(
+            String userId,
+            String groupId,
+            String encGroupId,
+            String lookupId,
+            Integer lookupVersion,
+            String encGroupMemberId,
+            long timestampMillis
+    ) {
         LocalDateTime timestamp = new Timestamp(timestampMillis).toLocalDateTime();
-        return new GroupProxyUser(userId, encGroupId, timestamp, encGroupMemberId);
+        return new GroupProxyUser(userId, groupId, encGroupId, lookupId, lookupVersion, timestamp, encGroupMemberId);
     }
 }
