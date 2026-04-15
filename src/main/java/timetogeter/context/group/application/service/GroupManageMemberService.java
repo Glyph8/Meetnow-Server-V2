@@ -305,10 +305,10 @@ public class GroupManageMemberService {
 //======================
 
     //그룹 관리 - 그룹 나가기 - step1 - 메인 서비스 메소드
-    public LeaveGroup1Response leaveGroup1(LeavGroup1Request request, String userID) {
+    public LeaveGroup1Response leaveGroup1(LeavGroup1Request request, String userId) {
         GroupProxyUser groupProxyUser = GroupLookupSupport.findGroupProxyUserWithFallbackOrThrow(
                 groupProxyUserRepository,
-                userID,
+                userId,
                 request.groupId(),
                 request.lookupId(),
                 request.lookupVersion(),
@@ -322,7 +322,7 @@ public class GroupManageMemberService {
         Group group = groupRepository.findByGroupId(request.groupId())
                 .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND, "[ERROR]: 존재하지 않는 그룹입니다: "));
 
-        boolean isManager = userID.equals(group.getManagerId());
+        boolean isManager = userId.equals(group.getManagerId());
         return new LeaveGroup1Response(request.groupId() ,
                 group.getGroupName()+" 그룹에서 나가시겠어요?",
                 isManager);

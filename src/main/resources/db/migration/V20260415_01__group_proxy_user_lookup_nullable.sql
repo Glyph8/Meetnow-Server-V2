@@ -1,4 +1,4 @@
--- group_proxy_user lookup 전환 1차: nullable 컬럼 추가 + 조회 유니크 인덱스 추가
+-- group_proxy_user lookup 전환 1차: nullable 컬럼 추가 + 조회 unique 인덱스 조건부 추가
 ALTER TABLE group_proxy_user
     ADD COLUMN IF NOT EXISTS group_id VARCHAR(255) NULL,
     ADD COLUMN IF NOT EXISTS lookup_id VARCHAR(64) NULL,
