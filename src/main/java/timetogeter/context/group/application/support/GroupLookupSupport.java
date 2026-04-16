@@ -24,6 +24,20 @@ public final class GroupLookupSupport {
     }
 
     public static Lookup resolveLookupForWrite(String lookupId, Integer lookupVersion, String userId, String groupId) {
+        if (groupId == null || groupId.isBlank()) {
+            throw new GroupLookupValidationException(
+                    BaseErrorCode.BAD_REQUEST,
+                    "[ERROR]: groupId is required for group lookup write"
+            );
+        }
+        boolean hasLookupId = lookupId != null && !lookupId.isBlank();
+        boolean hasLookupVersion = lookupVersion != null;
+        if (hasLookupId != hasLookupVersion) {
+            throw new GroupLookupValidationException(
+                    BaseErrorCode.BAD_REQUEST,
+                    "[ERROR]: lookupId and lookupVersion must be provided together"
+            );
+        }
         if (!hasLookup(lookupId, lookupVersion)) {
             return new Lookup(generateLookupId(userId, groupId), LOOKUP_VERSION_V1);
         }

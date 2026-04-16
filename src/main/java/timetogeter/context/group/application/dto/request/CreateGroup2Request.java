@@ -9,4 +9,13 @@ public record CreateGroup2Request(
         String lookupId,
         Integer lookupVersion
 ) {
+    public CreateGroup2Request(
+            String groupId,
+            String encGroupId,
+            String encencGroupMemberId,
+            String encUserId,
+            String encGroupKey
+    ) {
+        this(groupId, encGroupId, encencGroupMemberId, encUserId, encGroupKey, null, null);
+    }
 }
