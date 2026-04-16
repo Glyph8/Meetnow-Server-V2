@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -122,7 +123,7 @@ public class GroupDetailController {
     @PostMapping(value = "/edit1", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<EditGroup1Response> editGroup1(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody EditGroup1Request request) throws Exception{
+            @RequestBody @Valid EditGroup1Request request) throws Exception{
         String managerId = userPrincipal.getId();
         EditGroup1Response response = groupManageInfoService.editGroup1(request, managerId);
         return new BaseResponse<>(response);

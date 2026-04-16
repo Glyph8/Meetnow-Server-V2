@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -262,7 +263,7 @@ public class GroupController {
     @PostMapping(value = "/new2", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<CreateGroup2Response> createGroup2(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody CreateGroup2Request request) throws Exception{
+            @RequestBody @Valid CreateGroup2Request request) throws Exception{
         String userId = userPrincipal.getId();
         CreateGroup2Response response = groupManageInfoService.createGroup2(request,userId);
         return new BaseResponse(response);

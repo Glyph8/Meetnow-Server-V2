@@ -2,6 +2,12 @@
 
 ## 1) 프론트 문의 답변
 
+### 1-0. 현재 기준 최종 계약(즉시 안정화 단계)
+- Promise/Group 조회·참여 요청은 `lookupId`(64-char lowercase hex), `lookupVersion`(현재 1)을 기본 계약으로 사용합니다.
+- `encUserId`/`encGroupId`는 **호환 fallback 경로**이며, 아래 플래그가 꺼지면 사용이 중단됩니다.
+  - `promise.promisekey2.fallback-enabled`
+  - `group.lookup.fallback-enabled`
+
 ### 1-1. idempotent의 “동일 key” 판정 기준
 - **현재 서버는 encPromiseKey 암호문 문자열 직접 비교를 idempotent 판정에 사용하지 않습니다.**
 - 이유: AES-GCM 랜덤 IV로 동일 평문도 매번 다른 암호문이 되므로, 암호문 문자열 비교는 오탐(거짓 충돌)을 유발합니다.
@@ -39,6 +45,11 @@
   - 최근 3일 연속 fallback hit = 0 (피크 시간대 포함)
   - `promisekey2.not_found.count` 급증 없음(전주 대비 +20% 이내)
   - FE 배포율 99%+ (lookup 필드 전송 클라이언트)
+- `group.lookup.fallback-enabled=false` 전환 권장 조건:
+  - 최근 7일 이동평균 `group.lookup.fallback.count / group.lookup.success.count < 0.1%`
+  - 최근 3일 연속 encGroupId fallback hit = 0
+  - lookup validation fail 급증 없음(전주 대비 +20% 이내)
+  - FE 배포율 99%+ (group 관련 API lookup 필드 기본 전송)
 
 ---
 
@@ -83,13 +94,42 @@
 - not_found.count: 전주 동시간대 대비 2배 초과
 - unique_conflict.count: 0 baseline 대비 급증(1분 5건 이상)
 
+### 3-6. `group.lookup.success.count`
+- 값: group lookup 조회 성공 건수
+- 태그 예시: `path=lookup|group_id|enc_group_id`
+
+### 3-7. `group.lookup.fallback.count`
+- 값: group lookup fallback 경로 성공 건수
+- 태그 예시: `path=group_id|enc_group_id`
+
+### 3-8. `group.lookup.validation.fail.count`
+- 값: group lookup 검증 실패 건수
+- 태그 예시: `reason=missing_lookup|invalid_lookup_version|invalid_lookup_id_format|fallback_disabled|...`
+
+### 3-9. `group.lookup.version.count` / `promise.lookup.version.count`
+- 값: lookupVersion 분포 카운트
+- 태그 예시: `lookupVersion=1`
+
 ---
 
-## 4) CodeQL 타임아웃 재실행 정책
+## 4) soft → hard fallback 전환 절차
+
+1. soft 단계(기본): fallback-enabled=true
+   - lookup 우선 조회 + fallback 허용
+   - fallback/validation 지표 모니터링
+2. hard 단계(전환): fallback-enabled=false
+   - legacy fallback 차단
+   - lookup 미전송/legacy 의존 요청은 표준 validation 에러로 응답
+3. 롤백:
+   - 긴급 시 fallback-enabled=true로 즉시 복구
+   - 복구 후 fallback 발생 경로(클라이언트 버전/엔드포인트) 역추적
+
+---
+
+## 5) CodeQL 타임아웃 재실행 정책
 
 - 기본 원칙: PR 완료 전 CodeQL 최소 1회 성공 결과 확보
 - 타임아웃 시: **최소 1회 재시도**
 - 재시도도 타임아웃이면:
   - 원인(러너 상태/시간대/큐 적체) 기록
   - 수동 재실행 계획과 완료 책임자 지정 후 머지 결정
-

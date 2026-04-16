@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -213,7 +214,7 @@ public class GroupManageController {
     @PostMapping(value = "/member/save", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<JoinGroupResponse> saveGroupMember(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody SaveGroupMemberRequest request) {
+            @RequestBody @Valid SaveGroupMemberRequest request) {
         String userId = userPrincipal.getId();
         JoinGroupResponse response = groupManageMemberService.saveGroupMember(request, userId);
         return new BaseResponse<>(response);
@@ -296,7 +297,7 @@ public class GroupManageController {
     @PostMapping(value = "/invite1", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<InviteGroup1Response> inviteGroup1(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody InviteGroup1Request request) throws Exception{
+            @RequestBody @Valid InviteGroup1Request request) throws Exception{
         String userId = userPrincipal.getId();
         InviteGroup1Response response = groupManageMemberService.inviteGroup1(request,userId);
         return new BaseResponse<>(response);
@@ -596,7 +597,7 @@ public class GroupManageController {
     @PostMapping(value = "/leave1", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<LeaveGroup1Response> leaveGroup1(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody LeavGroup1Request request) throws Exception{
+            @RequestBody @Valid LeavGroup1Request request) throws Exception{
         String userId = userPrincipal.getId();
         LeaveGroup1Response response = groupManageMemberService.leaveGroup1(request, userId);
         return new BaseResponse(response);
@@ -635,7 +636,7 @@ public class GroupManageController {
     @PostMapping(value = "/leave2", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<LeaveGroup2Response> leaveGroup2(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody LeaveGroup2Request request) throws Exception{
+            @RequestBody @Valid LeaveGroup2Request request) throws Exception{
         String userId = userPrincipal.getId();
         LeaveGroup2Response response = groupManageMemberService.leaveGroup2(request, userId);
         return new BaseResponse(response);

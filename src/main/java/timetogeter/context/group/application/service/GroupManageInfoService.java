@@ -2,6 +2,7 @@ package timetogeter.context.group.application.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import timetogeter.context.group.application.dto.request.*;
@@ -32,6 +33,8 @@ public class GroupManageInfoService {
     private final GroupRepository groupRepository;
     private final GroupProxyUserRepository groupProxyUserRepository;
     private final GroupShareKeyRepository groupShareKeyRepository;
+    @Value("${group.lookup.fallback-enabled:true}")
+    private boolean groupLookupFallbackEnabled;
 
 //======================
 // 그룹 관리 - 그룹 만들기 (Step1,2)
@@ -57,7 +60,7 @@ public class GroupManageInfoService {
         String encUserId = request.encUserId(); //그룹키로 암호화한 사용자 고유 아이디
         String encGroupKey = request.encGroupKey(); //개인키로 암호화한 그룹키
         GroupLookupSupport.Lookup lookup = GroupLookupSupport.resolveLookupForWrite(
-                request.lookupId(), request.lookupVersion(), userId, groupId
+                request.lookupId(), request.lookupVersion(), groupId
         );
 
         //GroupProxyUser테이블 내 저장
@@ -116,6 +119,7 @@ public class GroupManageInfoService {
                 request.lookupId(),
                 request.lookupVersion(),
                 request.encGroupId(),
+                groupLookupFallbackEnabled,
                 () -> new GroupProxyUserNotFoundException(
                         BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
                         "[ERROR]: 해당 유저의 그룹 프록시 정보가 없습니다."

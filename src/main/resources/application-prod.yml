@@ -101,4 +101,8 @@ server:
 
 promise:
   promisekey2:
-    fallback-enabled: true
+    fallback-enabled: ${PROMISE_KEY_FALLBACK_ENABLED:true}
+
+group:
+  lookup:
+    fallback-enabled: ${GROUP_LOOKUP_FALLBACK_ENABLED:true}
