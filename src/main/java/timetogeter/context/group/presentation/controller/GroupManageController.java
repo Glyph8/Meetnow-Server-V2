@@ -636,7 +636,8 @@ public class GroupManageController {
     public BaseResponse<LeaveGroup2Response> leaveGroup2(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody LeaveGroup2Request request) throws Exception{
-        LeaveGroup2Response response = groupManageMemberService.leaveGroup2(request);
+        String userId = userPrincipal.getId();
+        LeaveGroup2Response response = groupManageMemberService.leaveGroup2(request, userId);
         return new BaseResponse(response);
     }
 

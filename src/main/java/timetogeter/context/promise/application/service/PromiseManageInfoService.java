@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import timetogeter.context.auth.domain.repository.UserRepository;
 import timetogeter.context.auth.exception.UserNotFoundException;
+import timetogeter.context.group.application.support.GroupLookupSupport;
 import timetogeter.context.group.exception.GroupIdNotFoundException;
 import timetogeter.context.group.exception.GroupProxyUserNotFoundException;
 import timetogeter.context.group.exception.GroupShareKeyNotFoundException;
@@ -107,9 +108,24 @@ public class PromiseManageInfoService {
     //약속 만들기 - 기본 정보 입력 Step1 - 메인 서비스 메소드
     @Transactional
     public CreatePromise1Response createPromise1(String userId, CreatePromise1Request request) {
+        String groupId = request.groupId();
         String encGroupId = request.encGroupId();
-        GroupProxyUser groupProxyUserFound = groupProxyUserRepository.findByUserIdAndEncGroupId(userId,encGroupId)
-                .orElseThrow(() -> new GroupProxyUserNotFoundException(BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND, "[ERROR]: 해당 유저의 그룹 프록시 정보가 없습니다."));
+        String lookupId = request.lookupId();
+        Integer lookupVersion = request.lookupVersion();
+
+        GroupProxyUser groupProxyUserFound = GroupLookupSupport
+                .findGroupProxyUserWithFallback(
+                        groupProxyUserRepository,
+                        userId,
+                        groupId,
+                        lookupId,
+                        lookupVersion,
+                        encGroupId
+                )
+                .orElseThrow(() -> new GroupProxyUserNotFoundException(
+                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                        "[ERROR]: 해당 유저의 그룹 프록시 정보가 없습니다."
+                ));
 
         /*
         '개인키로 암호화된 그룹 아이디'-> encGroupId

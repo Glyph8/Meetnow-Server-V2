@@ -14,6 +14,7 @@ import timetogeter.context.auth.domain.repository.UserRepository;
 import timetogeter.context.auth.exception.UserNotFoundException;
 import timetogeter.context.group.application.dto.request.*;
 import timetogeter.context.group.application.dto.response.*;
+import timetogeter.context.group.application.support.GroupLookupSupport;
 import timetogeter.global.mail.EmailService;
 import timetogeter.context.group.exception.GroupIdNotFoundException;
 import timetogeter.context.group.exception.GroupInviteCodeExpired;
@@ -44,7 +45,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 @Slf4j
 public class GroupManageMemberService {
-
     @Autowired
     private AmazonS3 amazonS3;
 
@@ -76,10 +76,18 @@ public class GroupManageMemberService {
     @Transactional
     public InviteGroup1Response inviteGroup1(InviteGroup1Request request,String userId) {
         String groupId = request.groupId();
-        String encGroupId = request.encGroupId();
-
-        GroupProxyUser groupProxyUser = groupProxyUserRepository.findByUserIdAndEncGroupId(userId, encGroupId)
-                .orElseThrow(() -> new GroupProxyUserNotFoundException(BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND, "[ERROR]: 해당 그룹 프록시 정보가 없습니다."));
+        GroupProxyUser groupProxyUser = GroupLookupSupport.findGroupProxyUserWithFallbackOrThrow(
+                groupProxyUserRepository,
+                userId,
+                groupId,
+                request.lookupId(),
+                request.lookupVersion(),
+                request.encGroupId(),
+                () -> new GroupProxyUserNotFoundException(
+                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                        "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
+                )
+        );
         String encEncGroupMemberId = groupProxyUser.getEncGroupMemberId();
 
         return new InviteGroup1Response(encEncGroupMemberId);
@@ -159,9 +167,20 @@ public class GroupManageMemberService {
         String encUserId = request.encUserId(); //그룹키로 암호화한 사용자 고유 아이디
         String encGroupId = request.encGroupId(); //개인키로 암호화한 그룹 아이디
         String encencGroupMemberId = request.encencGroupMemberId(); //개인키로 암호화한 encUserId
+        GroupLookupSupport.Lookup lookup = GroupLookupSupport.resolveLookupForWrite(
+                request.lookupId(), request.lookupVersion(), userId, groupId
+        );
 
         //GroupProxyUser에 저장
-        groupProxyUserRepository.save(GroupProxyUser.of(userId, encGroupId, encencGroupMemberId, System.currentTimeMillis()));
+        groupProxyUserRepository.save(GroupProxyUser.of(
+                userId,
+                groupId,
+                encGroupId,
+                lookup.lookupId(),
+                lookup.lookupVersion(),
+                encencGroupMemberId,
+                System.currentTimeMillis()
+        ));
 
         //GroupShareKey에 저장
         groupShareKeyRepository.save(GroupShareKey.of(groupId, encUserId, encGroupKey));
@@ -222,9 +241,20 @@ public class GroupManageMemberService {
         String encUserId = request.encUserId(); //그룹키로 암호화한 사용자 고유 아이디
         String encGroupId = request.encGroupId(); //개인키로 암호화한 그룹 아이디
         String encencGroupMemberId = request.encencGroupMemberId(); //개인키로 암호화한 encUserId
+        GroupLookupSupport.Lookup lookup = GroupLookupSupport.resolveLookupForWrite(
+                request.lookupId(), request.lookupVersion(), userId, groupId
+        );
 
         //GroupProxyUser에 저장
-        groupProxyUserRepository.save(GroupProxyUser.of(userId,encGroupId,encencGroupMemberId,System.currentTimeMillis()));
+        groupProxyUserRepository.save(GroupProxyUser.of(
+                userId,
+                groupId,
+                encGroupId,
+                lookup.lookupId(),
+                lookup.lookupVersion(),
+                encencGroupMemberId,
+                System.currentTimeMillis()
+        ));
 
         //GroupShareKey에 저장
         groupShareKeyRepository.save(GroupShareKey.of(groupId, encUserId, encGroupKey));
@@ -275,23 +305,43 @@ public class GroupManageMemberService {
 //======================
 
     //그룹 관리 - 그룹 나가기 - step1 - 메인 서비스 메소드
-    public LeaveGroup1Response leaveGroup1(LeavGroup1Request request, String userID) {
-        GroupProxyUser groupProxyUser = groupProxyUserRepository.findByEncGroupId(request.encGroupId())
-                .orElseThrow(() -> new GroupProxyUserNotFoundException(BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND, "[ERROR]: 해당 그룹 프록시 정보가 없습니다"));
+    public LeaveGroup1Response leaveGroup1(LeavGroup1Request request, String userId) {
+        GroupProxyUser groupProxyUser = GroupLookupSupport.findGroupProxyUserWithFallbackOrThrow(
+                groupProxyUserRepository,
+                userId,
+                request.groupId(),
+                request.lookupId(),
+                request.lookupVersion(),
+                request.encGroupId(),
+                () -> new GroupProxyUserNotFoundException(
+                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                        "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
+                )
+        );
 
         Group group = groupRepository.findByGroupId(request.groupId())
                 .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND, "[ERROR]: 존재하지 않는 그룹입니다: "));
 
-        boolean isManager = userID.equals(group.getManagerId());
+        boolean isManager = userId.equals(group.getManagerId());
         return new LeaveGroup1Response(request.groupId() ,
                 group.getGroupName()+" 그룹에서 나가시겠어요?",
                 isManager);
     }
 
     //그룹 관리 - 그룹 나가기 - step2 - 메인 서비스 메소드
-    public LeaveGroup2Response leaveGroup2(LeaveGroup2Request request) {
-        GroupProxyUser groupProxyUser = groupProxyUserRepository.findByEncGroupId(request.encGroupId())
-                .orElseThrow(() -> new GroupProxyUserNotFoundException(BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND, "[ERROR]: 해당 그룹 프록시 정보가 없습니다"));
+    public LeaveGroup2Response leaveGroup2(LeaveGroup2Request request, String userId) {
+        GroupProxyUser groupProxyUser = GroupLookupSupport.findGroupProxyUserWithFallbackOrThrow(
+                groupProxyUserRepository,
+                userId,
+                request.groupId(),
+                request.lookupId(),
+                request.lookupVersion(),
+                request.encGroupId(),
+                () -> new GroupProxyUserNotFoundException(
+                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
+                        "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
+                )
+        );
 
         String encencGroupMemberId = groupProxyUser.getEncGroupMemberId();
 
