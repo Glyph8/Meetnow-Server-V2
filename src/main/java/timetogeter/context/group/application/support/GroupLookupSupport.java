@@ -52,6 +52,10 @@ public final class GroupLookupSupport {
             if (byLookup.isPresent()) {
                 return byLookup;
             }
+            Optional<GroupProxyUser> byGroupId = repository.findByUserIdAndGroupId(userId, groupId);
+            if (byGroupId.isPresent()) {
+                return byGroupId;
+            }
             if (encGroupId == null || encGroupId.isBlank()) {
                 return Optional.empty();
             }
