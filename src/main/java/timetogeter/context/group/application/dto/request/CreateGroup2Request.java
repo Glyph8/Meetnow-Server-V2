@@ -5,6 +5,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 @Schema(requiredProperties = {
         "groupId",
         "encGroupId",
@@ -30,6 +34,21 @@ public record CreateGroup2Request(
             String encUserId,
             String encGroupKey
     ) {
-        this(groupId, encGroupId, encencGroupMemberId, encUserId, encGroupKey, "0".repeat(64), 1);
+        this(groupId, encGroupId, encencGroupMemberId, encUserId, encGroupKey, generateLegacyLookupId(groupId, encUserId), 1);
+    }
+
+    private static String generateLegacyLookupId(String groupId, String encUserId) {
+        String source = (groupId == null ? "" : groupId) + "|" + (encUserId == null ? "" : encUserId);
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(source.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm is required for legacy lookup generation", e);
+        }
     }
 }

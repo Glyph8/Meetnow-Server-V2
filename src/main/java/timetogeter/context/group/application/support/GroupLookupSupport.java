@@ -55,6 +55,15 @@ public final class GroupLookupSupport {
         return new Lookup(lookupId, lookupVersion);
     }
 
+    /**
+     * @deprecated userId is no longer used for lookup resolution. Use
+     * {@link #resolveLookupForWrite(String, Integer, String)} instead.
+     */
+    @Deprecated(forRemoval = false, since = "2026-04")
+    public static Lookup resolveLookupForWrite(String lookupId, Integer lookupVersion, String userId, String groupId) {
+        return resolveLookupForWrite(lookupId, lookupVersion, groupId);
+    }
+
     public static Optional<GroupProxyUser> findGroupProxyUserWithFallback(
             GroupProxyUserRepository repository,
             String userId,
