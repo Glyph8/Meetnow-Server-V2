@@ -101,11 +101,11 @@ public class GroupManageMemberService {
         if (groupProxyUser.isEmpty()) {
             boolean hasLookup = GroupLookupSupport.hasLookup(request.lookupId(), request.lookupVersion());
             if (hasLookup) {
-                boolean lookupExists = groupProxyUserRepository.existsByGroupIdAndLookup(
+                boolean lookupExists = groupProxyUserRepository.countByGroupIdAndLookup(
                         groupId,
                         request.lookupId(),
                         request.lookupVersion()
-                );
+                ) > 0;
                 if (!lookupExists) {
                     throw new GroupProxyUserNotFoundException(
                             BaseErrorCode.LOOKUP_NOT_FOUND,

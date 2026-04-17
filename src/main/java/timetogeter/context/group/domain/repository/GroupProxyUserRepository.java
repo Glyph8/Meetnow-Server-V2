@@ -37,12 +37,12 @@ public interface GroupProxyUserRepository extends JpaRepository<GroupProxyUser, 
     );
 
     @Query(value = """
-            SELECT COUNT(*) > 0 FROM group_proxy_user
+            SELECT COUNT(*) FROM group_proxy_user
             WHERE group_id = :groupId
               AND lookup_id = :lookupId
               AND lookup_version = :lookupVersion
             """, nativeQuery = true)
-    boolean existsByGroupIdAndLookup(
+    long countByGroupIdAndLookup(
             @Param("groupId") String groupId,
             @Param("lookupId") String lookupId,
             @Param("lookupVersion") Integer lookupVersion
