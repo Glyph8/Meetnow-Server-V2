@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import timetogeter.context.auth.exception.InvalidJwtException;
 import timetogeter.context.auth.domain.adaptor.UserPrincipal;
 import timetogeter.context.group.application.dto.request.*;
 import timetogeter.context.group.application.dto.response.*;
@@ -23,6 +24,7 @@ import timetogeter.context.group.application.service.GroupManageInfoService;
 import timetogeter.context.group.application.service.GroupManageMemberService;
 import timetogeter.global.interceptor.response.BaseResponse;
 import timetogeter.global.interceptor.response.error.dto.ErrorResponse;
+import timetogeter.global.interceptor.response.error.status.BaseErrorCode;
 
 @RestController
 @RequestMapping("/api/v1/group")
@@ -324,6 +326,9 @@ public class GroupManageController {
     public BaseResponse<InviteGroup1Response> inviteGroup1(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody @Valid InviteGroup1Request request) throws Exception{
+        if (userPrincipal == null) {
+            throw new InvalidJwtException(BaseErrorCode.INVALID_TOKEN, "[ERROR] 인증 정보가 없습니다.");
+        }
         String userId = userPrincipal.getId();
         InviteGroup1Response response = groupManageMemberService.inviteGroup1(request,userId);
         return new BaseResponse<>(response);

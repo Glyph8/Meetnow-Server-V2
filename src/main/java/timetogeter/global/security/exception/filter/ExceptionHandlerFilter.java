@@ -11,6 +11,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import timetogeter.context.auth.exception.InvalidJwtException;
+import timetogeter.global.interceptor.response.error.CustomException;
 import timetogeter.global.interceptor.response.error.status.BaseErrorCode;
 
 import java.io.IOException;
@@ -28,15 +30,33 @@ public class ExceptionHandlerFilter extends OncePerRequestFilter {
 
         try {
             filterChain.doFilter(req, res);
+        }catch (InvalidJwtException e){
+            log.error("[ERROR] {}", e.getMessage());
+            handleException(e.getStatus(), res, resolveRequestId(req));
+        }catch (CustomException e){
+            log.error("[ERROR] {}", e.getMessage(), e);
+            handleException(e.getStatus(), res, resolveRequestId(req));
         }catch (JwtException | AuthenticationException e){
-            log.error("[ERROR] " + e.getMessage());
-            handleException(BaseErrorCode.INVALID_TOKEN, res);
+            log.error("[ERROR] {}", e.getMessage(), e);
+            handleException(BaseErrorCode.INVALID_TOKEN, res, resolveRequestId(req));
         }catch (AccessDeniedException e){
-            log.error("[ERROR] " + e.getMessage());
-            handleException(BaseErrorCode.INVALID_USER, res);
+            log.error("[ERROR] {}", e.getMessage(), e);
+            handleException(BaseErrorCode.INVALID_USER, res, resolveRequestId(req));
         }catch (Exception e){
-            log.error("[ERROR] 알 수 없는 서버오류입니다 : " + e.getMessage());
-            handleException(BaseErrorCode.INTERNAL_SERVER_ERROR, res);
+            log.error("[ERROR] 알 수 없는 서버오류입니다 : {}", e.getMessage(), e);
+            handleException(BaseErrorCode.INTERNAL_SERVER_ERROR, res, resolveRequestId(req));
         }
+    }
+
+    private String resolveRequestId(HttpServletRequest request) {
+        String requestId = request.getHeader("X-Request-Id");
+        if (requestId != null && !requestId.isBlank()) {
+            return requestId;
+        }
+        String correlationId = request.getHeader("X-Correlation-Id");
+        if (correlationId != null && !correlationId.isBlank()) {
+            return correlationId;
+        }
+        return null;
     }
 }
