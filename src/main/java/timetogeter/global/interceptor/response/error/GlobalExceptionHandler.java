@@ -13,9 +13,19 @@ import timetogeter.global.interceptor.response.error.dto.ErrorResponse;
 import timetogeter.global.interceptor.response.error.status.BaseErrorCode;
 import timetogeter.global.interceptor.response.StatusCode;
 
+import java.util.Set;
+
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+    private static final Set<String> LOOKUP_CONTRACT_PATHS = Set.of(
+            "/api/v1/group/invite1",
+            "/api/v1/group/new2",
+            "/api/v1/group/member/save",
+            "/api/v1/group/leave1",
+            "/api/v1/group/leave2",
+            "/api/v1/group/edit1"
+    );
 
     // 기존 컨텍스트별 ExceptionHandler에서 처리하지 못하는
     // 요청 본문 파싱/검증 예외를 ErrorResponse 포맷으로 통일한다.
@@ -48,12 +58,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             return BaseErrorCode.INVALID_PARAMETER;
         }
 
-        if (path.equals("/api/v1/group/invite1")
-                || path.equals("/api/v1/group/new2")
-                || path.equals("/api/v1/group/member/save")
-                || path.equals("/api/v1/group/leave1")
-                || path.equals("/api/v1/group/leave2")
-                || path.equals("/api/v1/group/edit1")) {
+        if (LOOKUP_CONTRACT_PATHS.contains(path)) {
             return BaseErrorCode.LOOKUP_INVALID_FORMAT;
         }
 
