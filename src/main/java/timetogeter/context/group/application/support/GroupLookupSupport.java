@@ -114,6 +114,28 @@ public final class GroupLookupSupport {
                 successCounter("lookup", endpoint).increment();
                 return byLookup;
             }
+            String canonicalLookupId = generateLookupId(userId, groupId);
+            if (!lookupId.equals(canonicalLookupId)) {
+                Optional<GroupProxyUser> byCanonicalLookup = repository.findByUserIdAndGroupIdAndLookup(
+                        userId,
+                        groupId,
+                        canonicalLookupId,
+                        lookupVersion
+                );
+                if (byCanonicalLookup.isPresent()) {
+                    fallbackCounter("lookup_canonical", endpoint).increment();
+                    successCounter("lookup_canonical", endpoint).increment();
+                    LOGGER.info(
+                            "group lookup fallback hit by canonical lookupId: endpoint={}, userId={}, groupId={}, requestedLookupId={}, canonicalLookupId={}",
+                            endpoint,
+                            userId,
+                            groupId,
+                            maskLookupId(lookupId),
+                            maskLookupId(canonicalLookupId)
+                    );
+                    return byCanonicalLookup;
+                }
+            }
             if (fallbackEnabled) {
                 Optional<GroupProxyUser> byGroupId = repository.findByUserIdAndGroupId(userId, groupId);
                 if (byGroupId.isPresent()) {
