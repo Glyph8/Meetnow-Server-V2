@@ -98,6 +98,9 @@ public class GroupManageMemberService {
                 groupLookupFallbackEnabled,
                 "/api/v1/group/invite1"
         );
+        if (groupProxyUser.isEmpty() && request.encGroupId() != null && !request.encGroupId().isBlank()) {
+            groupProxyUser = groupProxyUserRepository.findByUserIdAndEncGroupId(userId, request.encGroupId());
+        }
         if (groupProxyUser.isEmpty()) {
             boolean hasLookup = GroupLookupSupport.hasLookup(request.lookupId(), request.lookupVersion());
             if (hasLookup) {
