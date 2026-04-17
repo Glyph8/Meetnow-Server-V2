@@ -47,6 +47,12 @@ public class GroupExceptionHandler {
         return ErrorResponse.of(e.getStatus());
     }
 
+    @ExceptionHandler(GroupProxyUserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handle_GroupProxyUserNotFoundException(GroupProxyUserNotFoundException e) {
+        log.error("GroupExceptionHandler.handle_GroupProxyUserNotFoundException <{}> {}", e.getMessage(), e);
+        return ErrorResponse.of(e.getStatus());
+    }
+
     @ExceptionHandler(GroupLookupValidationException.class)
     public ResponseEntity<ErrorResponse> handle_GroupLookupValidationException(GroupLookupValidationException e) {
         log.error("GroupExceptionHandler.handle_GroupLookupValidationException <{}> {}", e.getMessage(), e);

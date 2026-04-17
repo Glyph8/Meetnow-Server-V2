@@ -237,7 +237,9 @@ public class GroupManageController {
     @Operation(
             summary = "그룹 초대 - Step1",
             description = """
-        그룹원이 groupId와 개인키로 암호화한 그룹 아이디를 서버에 전송하면,
+        lookup 모드 요청 계약: groupId + lookupId + lookupVersion (필수)
+        encGroupId는 legacy fallback용 선택 필드이며, fallback 비활성화 시 무시/실패될 수 있습니다.
+        그룹원이 계약에 맞는 식별값을 서버에 전송하면,
         서버는 GroupProxyUser 테이블에서 encencGroupMemberId를 반환합니다.
         """,
             security = @SecurityRequirement(name = "BearerAuth")
@@ -246,7 +248,7 @@ public class GroupManageController {
             @ApiResponse(responseCode = "200", description = "성공",
                     content = @Content(schema = @Schema(implementation = InviteGroup1Response.class))
             ),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (필드 누락/유효성 실패)",
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (LOOKUP_INVALID_FORMAT / LOOKUP_VERSION_UNSUPPORTED / LOOKUP_LEGACY_FALLBACK_DISABLED)",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
@@ -254,8 +256,8 @@ public class GroupManageController {
                                     @ExampleObject(name = "groupId 누락", value = """
                     { "code": 400, "message": "groupId는 필수입니다." }
                     """),
-                                    @ExampleObject(name = "encGroupId 누락", value = """
-                    { "code": 400, "message": "encGroupId는 필수입니다." }
+                                    @ExampleObject(name = "lookupId 형식 오류", value = """
+                    { "code": 400, "message": "lookupId 형식이 올바르지 않아요" }
                     """)
                             }
                     )
@@ -278,12 +280,21 @@ public class GroupManageController {
                 """)
                     )
             ),
-            @ApiResponse(responseCode = "422", description = "복호화/무결성 오류",
+            @ApiResponse(responseCode = "404", description = "lookup 대상 없음 (LOOKUP_NOT_FOUND 성격)",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = """
-                { "code": 422, "message": "encGroupId 복호화 실패" }
+                { "code": 404, "message": "해당 객체가 존재하지 않습니다." }
+                """)
+                    )
+            ),
+            @ApiResponse(responseCode = "409", description = "버전/상태 충돌 (LOOKUP_CONFLICT 성격)",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = """
+                { "code": 409, "message": "lookup 요청 상태가 충돌합니다." }
                 """)
                     )
             ),
