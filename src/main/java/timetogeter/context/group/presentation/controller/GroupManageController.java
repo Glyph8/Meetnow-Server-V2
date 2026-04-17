@@ -130,6 +130,7 @@ public class GroupManageController {
             summary = "그룹 멤버 저장",
             description = """
         가공된 정보들을 받아 GroupProxyUser와 GroupShareKey 테이블에 저장합니다.
+        lookupId/lookupVersion은 필수이며, lookupId는 64-char 소문자 hex 형식이어야 합니다.
         그룹 참여가 완료되면 성공 메시지를 반환합니다.
         """,
             security = @SecurityRequirement(name = "BearerAuth")
@@ -150,7 +151,7 @@ public class GroupManageController {
                     """)
                     )
             ),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (필드 누락/유효성 실패)",
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (필드 누락/유효성 실패, LOOKUP_INVALID_FORMAT/LOOKUP_VERSION_UNSUPPORTED/LOOKUP_LEGACY_FALLBACK_DISABLED)",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
@@ -169,6 +170,9 @@ public class GroupManageController {
                             """),
                                     @ExampleObject(name = "encencGroupMemberId 누락", value = """
                             { "code": 400, "message": "encencGroupMemberId는 필수입니다." }
+                            """),
+                                    @ExampleObject(name = "lookupVersion 오류", value = """
+                            { "code": 400, "message": "지원하지 않는 lookupVersion 이에요" }
                             """)
                             }
                     )
@@ -570,6 +574,7 @@ public class GroupManageController {
     서버에서 그룹에서 나가겠냐는 메시지 반환
      */
     @Operation(summary = "그룹 나가기 - Step1", description = """
+    lookupId/lookupVersion을 기반으로 사용자의 그룹 프록시 정보를 검증한 뒤,
     서버에서 그룹에서 나가겠냐는 메시지를 반환합니다.
     사용자 확인 후, 나가기 전 메시지를 안내합니다.
 """)
@@ -577,7 +582,7 @@ public class GroupManageController {
             @ApiResponse(responseCode = "200", description = "퇴장 전 메시지 반환 성공",
                     content = @Content(schema = @Schema(implementation = LeaveGroup1Response.class))
             ),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류",
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (LOOKUP_INVALID_FORMAT/LOOKUP_VERSION_UNSUPPORTED/LOOKUP_LEGACY_FALLBACK_DISABLED 포함)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))
             ),
             @ApiResponse(responseCode = "401", description = "인증 실패",
@@ -608,15 +613,15 @@ public class GroupManageController {
 
     서버에서 encencMemberId 반환
      */
-    @Operation(summary = "그룹 나가기 - Step1", description = """
-    서버에서 그룹에서 나가겠냐는 메시지를 반환합니다.
-    사용자 확인 후, 나가기 전 메시지를 안내합니다.
+    @Operation(summary = "그룹 나가기 - Step2", description = """
+    lookupId/lookupVersion을 기반으로 사용자의 그룹 프록시 정보를 조회하고,
+    이후 단계에 필요한 encencGroupMemberId를 반환합니다.
 """)
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "퇴장 전 메시지 반환 성공",
-                    content = @Content(schema = @Schema(implementation = LeaveGroup1Response.class))
+            @ApiResponse(responseCode = "200", description = "encencGroupMemberId 반환 성공",
+                    content = @Content(schema = @Schema(implementation = LeaveGroup2Response.class))
             ),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류",
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (LOOKUP_INVALID_FORMAT/LOOKUP_VERSION_UNSUPPORTED/LOOKUP_LEGACY_FALLBACK_DISABLED 포함)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))
             ),
             @ApiResponse(responseCode = "401", description = "인증 실패",

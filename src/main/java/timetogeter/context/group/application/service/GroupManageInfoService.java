@@ -60,7 +60,7 @@ public class GroupManageInfoService {
         String encUserId = request.encUserId(); //그룹키로 암호화한 사용자 고유 아이디
         String encGroupKey = request.encGroupKey(); //개인키로 암호화한 그룹키
         GroupLookupSupport.Lookup lookup = GroupLookupSupport.resolveLookupForWrite(
-                request.lookupId(), request.lookupVersion(), groupId
+                request.lookupId(), request.lookupVersion(), groupId, "/api/v1/group/new2"
         );
 
         //GroupProxyUser테이블 내 저장
@@ -123,7 +123,8 @@ public class GroupManageInfoService {
                 () -> new GroupProxyUserNotFoundException(
                         BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
                         "[ERROR]: 해당 유저의 그룹 프록시 정보가 없습니다."
-                )
+                ),
+                "/api/v1/group/edit1"
         );
         String encEncGroupMemberId = groupProxyUser.getEncGroupMemberId();
 

@@ -90,7 +90,8 @@ public class GroupManageMemberService {
                 () -> new GroupProxyUserNotFoundException(
                         BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
                         "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
-                )
+                ),
+                "/api/v1/group/invite1"
         );
         String encEncGroupMemberId = groupProxyUser.getEncGroupMemberId();
 
@@ -172,7 +173,7 @@ public class GroupManageMemberService {
         String encGroupId = request.encGroupId(); //개인키로 암호화한 그룹 아이디
         String encencGroupMemberId = request.encencGroupMemberId(); //개인키로 암호화한 encUserId
         GroupLookupSupport.Lookup lookup = GroupLookupSupport.resolveLookupForWrite(
-                request.lookupId(), request.lookupVersion(), groupId
+                request.lookupId(), request.lookupVersion(), groupId, "/api/v1/group/member/save"
         );
 
         //GroupProxyUser에 저장
@@ -246,7 +247,7 @@ public class GroupManageMemberService {
         String encGroupId = request.encGroupId(); //개인키로 암호화한 그룹 아이디
         String encencGroupMemberId = request.encencGroupMemberId(); //개인키로 암호화한 encUserId
         GroupLookupSupport.Lookup lookup = GroupLookupSupport.resolveLookupForWrite(
-                request.lookupId(), request.lookupVersion(), groupId
+                request.lookupId(), request.lookupVersion(), groupId, "/api/v1/group/join"
         );
 
         //GroupProxyUser에 저장
@@ -321,7 +322,8 @@ public class GroupManageMemberService {
                 () -> new GroupProxyUserNotFoundException(
                         BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
                         "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
-                )
+                ),
+                "/api/v1/group/leave1"
         );
 
         Group group = groupRepository.findByGroupId(request.groupId())
@@ -346,7 +348,8 @@ public class GroupManageMemberService {
                 () -> new GroupProxyUserNotFoundException(
                         BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
                         "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
-                )
+                ),
+                "/api/v1/group/leave2"
         );
 
         String encencGroupMemberId = groupProxyUser.getEncGroupMemberId();

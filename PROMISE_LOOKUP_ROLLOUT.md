@@ -96,19 +96,28 @@
 
 ### 3-6. `group.lookup.success.count`
 - 값: group lookup 조회 성공 건수
-- 태그 예시: `path=lookup|group_id|enc_group_id`
+- 태그 예시: `path=lookup|group_id|enc_group_id`, `endpoint=/api/v1/group/new2|/api/v1/group/member/save|/api/v1/group/leave1|/api/v1/group/leave2|/api/v1/group/edit1|...`
 
 ### 3-7. `group.lookup.fallback.count`
 - 값: group lookup fallback 경로 성공 건수
-- 태그 예시: `path=group_id|enc_group_id`
+- 태그 예시: `path=group_id|enc_group_id`, `endpoint=...`
 
 ### 3-8. `group.lookup.validation.fail.count`
 - 값: group lookup 검증 실패 건수
-- 태그 예시: `reason=missing_lookup|invalid_lookup_version|invalid_lookup_id_format|fallback_disabled|...`
+- 태그 예시: `reason=missing_lookup|invalid_lookup_version|invalid_lookup_id_format|fallback_disabled|...`, `endpoint=...`
 
 ### 3-9. `group.lookup.version.count` / `promise.lookup.version.count`
 - 값: lookupVersion 분포 카운트
-- 태그 예시: `lookupVersion=1`
+- 태그 예시: `lookupVersion=1`, `endpoint=...`
+
+### 3-10. `group.lookup.not_found.count`
+- 값: group lookup 조회 미발견 건수
+- 태그 예시: `path=lookup|enc_group_id`, `endpoint=...`
+
+### 3-11. Group lookup 알람 임계치(권장)
+- validation.fail.count: 5분 이동평균이 전주 동시간 대비 2배 초과 + 10분 지속 시 경보
+- not_found.count: 5분 이동합이 baseline(최근 7일 p95) 초과 시 경보
+- fallback.count: hard 단계(`group.lookup.fallback-enabled=false`)에서 1건 이상 발생 시 즉시 경보
 
 ---
 

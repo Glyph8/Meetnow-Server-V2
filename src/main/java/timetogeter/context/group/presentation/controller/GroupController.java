@@ -225,20 +225,24 @@ public class GroupController {
     @Operation(summary = "그룹 만들기 - Step2", description = """
         그룹 키 및 암호화 정보를 포함하여 그룹을 최종 생성하는 단계입니다.
 
-        - 요청: GroupId, 개인키/그룹키로 암호화한 사용자 아이디 등(CreateGroup2Request)
+        - 요청: GroupId, 개인키/그룹키로 암호화한 사용자 아이디 + lookupId/lookupVersion(CreateGroup2Request)
+        - lookup 계약: lookupId(64-char hex), lookupVersion(현재 1) 필수
         - 처리: GroupProxyUser, Group, GroupShareKey 테이블에 저장
         - 반환: 생성 결과(CreateGroup2Response)
         """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "그룹 생성 성공",
                     content = @Content(schema = @Schema(implementation = BaseResponse.class))),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (필드 누락/유효성 실패)",
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (필드 누락/유효성 실패, LOOKUP_INVALID_FORMAT/LOOKUP_VERSION_UNSUPPORTED/LOOKUP_LEGACY_FALLBACK_DISABLED)",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = {
                                     @ExampleObject(name = "필수 필드 누락", value = """
                                     { "code": 400, "message": "groupId 또는 encUserId 등 필수 필드가 누락되었습니다." }
+                                    """),
+                                    @ExampleObject(name = "lookup 형식 오류", value = """
+                                    { "code": 400, "message": "lookupId 형식이 올바르지 않아요" }
                                     """)
                             }
                     )),
