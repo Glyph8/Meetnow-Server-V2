@@ -1,7 +1,6 @@
 package timetogeter.context.group.application.support;
 
 import io.micrometer.core.instrument.Metrics;
-import lombok.extern.slf4j.Slf4j;
 import timetogeter.context.group.domain.entity.GroupProxyUser;
 import timetogeter.context.group.domain.repository.GroupProxyUserRepository;
 import timetogeter.context.group.exception.GroupLookupValidationException;
@@ -14,11 +13,11 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
-@Slf4j
 public final class GroupLookupSupport {
     public static final int LOOKUP_VERSION_V1 = 1;
     private static final Pattern LOOKUP_ID_PATTERN = Pattern.compile("^[0-9a-f]{64}$");
     private static final String UNKNOWN_ENDPOINT = "unknown";
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(GroupLookupSupport.class);
 
     private GroupLookupSupport() {
     }
@@ -28,10 +27,10 @@ public final class GroupLookupSupport {
     }
 
     public static Lookup resolveLookupForWrite(String lookupId, Integer lookupVersion, String groupId) {
-        return resolveLookupForWrite(lookupId, lookupVersion, groupId, UNKNOWN_ENDPOINT);
+        return resolveLookupForWriteWithEndpoint(lookupId, lookupVersion, groupId, UNKNOWN_ENDPOINT);
     }
 
-    public static Lookup resolveLookupForWrite(String lookupId, Integer lookupVersion, String groupId, String endpoint) {
+    public static Lookup resolveLookupForWriteWithEndpoint(String lookupId, Integer lookupVersion, String groupId, String endpoint) {
         if (groupId == null || groupId.isBlank()) {
             validationFailCounter("missing_group_id", endpoint).increment();
             throw new GroupLookupValidationException(
@@ -66,7 +65,7 @@ public final class GroupLookupSupport {
      */
     @Deprecated(forRemoval = false, since = "2026-04")
     public static Lookup resolveLookupForWrite(String lookupId, Integer lookupVersion, String userId, String groupId) {
-        return resolveLookupForWrite(lookupId, lookupVersion, groupId, UNKNOWN_ENDPOINT);
+        return resolveLookupForWrite(lookupId, lookupVersion, groupId);
     }
 
     public static Optional<GroupProxyUser> findGroupProxyUserWithFallback(
@@ -120,7 +119,7 @@ public final class GroupLookupSupport {
                 if (byGroupId.isPresent()) {
                     fallbackCounter("group_id", endpoint).increment();
                     successCounter("group_id", endpoint).increment();
-                    log.info("group lookup fallback hit by groupId: endpoint={}, userId={}, groupId={}, lookupId={}", endpoint, userId, groupId, maskLookupId(lookupId));
+                    LOGGER.info("group lookup fallback hit by groupId: endpoint={}, userId={}, groupId={}, lookupId={}", endpoint, userId, groupId, maskLookupId(lookupId));
                     return byGroupId;
                 }
             }
@@ -148,7 +147,7 @@ public final class GroupLookupSupport {
         byEncGroupId.ifPresent(result -> {
             fallbackCounter("enc_group_id", endpoint).increment();
             successCounter("enc_group_id", endpoint).increment();
-            log.info("group lookup fallback hit by encGroupId: endpoint={}, userId={}, lookupId={}", endpoint, userId, maskLookupId(lookupId));
+            LOGGER.info("group lookup fallback hit by encGroupId: endpoint={}, userId={}, lookupId={}", endpoint, userId, maskLookupId(lookupId));
         });
         if (byEncGroupId.isEmpty()) {
             notFoundCounter("enc_group_id", endpoint).increment();

@@ -59,7 +59,7 @@ public class GroupManageInfoService {
         String encencGroupMemberId = request.encencGroupMemberId(); //개인키로 암호화한 (그룹키로 암호화한 사용자 고유 아이디)
         String encUserId = request.encUserId(); //그룹키로 암호화한 사용자 고유 아이디
         String encGroupKey = request.encGroupKey(); //개인키로 암호화한 그룹키
-        GroupLookupSupport.Lookup lookup = GroupLookupSupport.resolveLookupForWrite(
+        GroupLookupSupport.Lookup lookup = GroupLookupSupport.resolveLookupForWriteWithEndpoint(
                 request.lookupId(), request.lookupVersion(), groupId, "/api/v1/group/new2"
         );
 
