@@ -167,3 +167,72 @@
 - 전환 후 FE 책임:
   - 계산 로직 최소화
   - 서버 발급 식별자 전달 중심으로 단순화
+
+---
+
+## 10) FE 구현 완료본 검토 결과(2026-04-17)
+
+검토 결론은 **부분 호환**입니다.  
+Promise 경로는 대부분 반영되었고, Group 핵심 경로 및 hard 단계 대응은 추가 보완이 필요합니다.
+
+### 10-1. 확인된 반영 사항(OK)
+
+- `promisekey2`: lookup-first(`lookupId`, `lookupVersion`) + 필요 시 `encUserId` fallback
+- `promise/join1`: lookup 필드 포함
+- `group/invite1`: lookup-first + fallback 경로 존재
+- FE lookup 유틸 공통화 진행
+  - `/src/utils/client/promise-lookup.ts`
+  - `/src/utils/client/group-lookup.ts`
+- 공통 에러/메트릭 계층 추가
+  - `/src/api/lookup-error.ts`
+  - `/src/api/lookup-metrics.ts`
+- subjectId 전환 경계 추가
+  - `/src/utils/client/lookup-subject.ts`
+
+### 10-2. 백엔드 계약 대비 미스매치(필수 수정)
+
+1. Group 핵심 API 계약 누락
+- `/group/new2`, `/group/member/save` 요청에서 lookup 필드 누락 케이스 존재
+- 백엔드 계약 기준 둘 다 lookup 필수
+
+2. Group leave/edit lookup 강제 미흡
+- `leave1`, `leave2`, `edit1` 타입이 optional 상태로 남아 있는 구간 존재
+- API 레이어 자동 주입/강제 전송 보장 필요
+
+3. legacy-only 요청 경로 잔존
+- `groupId + encGroupId`만 보내는 경로가 남아 있음
+- hard 단계에서 즉시 실패 대상이므로 사전 제거 필요
+
+4. lookup 에러코드 분기 미흡
+- HTTP status 중심 처리만으로는 운영 분류 부족
+- 최소 아래 코드 기반 분기 반영 필요:
+  - `LOOKUP_INVALID_FORMAT`
+  - `LOOKUP_VERSION_UNSUPPORTED`
+  - `LOOKUP_LEGACY_FALLBACK_DISABLED`
+
+5. 메트릭 집계 수준 미흡
+- 콘솔 로그 중심(`console.info`)은 운영 대시보드/알림 연계에 부족
+- 집계 가능한 메트릭 sink(분류 태그 포함)로 이관 필요
+
+### 10-3. 우선순위별 보완 액션
+
+#### P0 (hard 단계 전 필수)
+- [ ] `/group/new2`, `/group/member/save` lookup 필드 **필수화**
+- [ ] `leave1/leave2/edit1` lookup **optional 제거** 및 자동 주입 보장
+- [ ] legacy-only 요청 경로 제거(lookup 없는 요청 차단)
+- [ ] lookup 오류코드 3종 기반 분기/UX/로깅 반영
+
+#### P1 (운영 안정화)
+- [ ] lookup 메트릭을 집계 가능한 형태로 전송(엔드포인트/버전/실패사유 태그)
+- [ ] fallback hit/validation fail/not found 대시보드 연결
+
+#### P2 (중기)
+- [ ] subjectId 경계 기준으로 lookup 계산 책임 축소
+
+### 10-4. hard 전환 게이트(재확인)
+
+- [ ] 최근 7일 fallback 비율 임계치 이하
+- [ ] 최근 3일 fallback hit 0 유지
+- [ ] FE 배포율 99%+
+- [ ] legacy-only 요청 0건
+- [ ] lookup 코드별 오류 분류/집계 확인
