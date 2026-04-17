@@ -107,6 +107,16 @@ public class GroupManageMemberService {
                         request.lookupVersion()
                 ) > 0;
                 if (!lookupExists) {
+                    String canonicalLookupId = GroupLookupSupport.generateLookupId(userId, groupId);
+                    if (!canonicalLookupId.equals(request.lookupId())) {
+                        lookupExists = groupProxyUserRepository.countByGroupIdAndLookup(
+                                groupId,
+                                canonicalLookupId,
+                                request.lookupVersion()
+                        ) > 0;
+                    }
+                }
+                if (!lookupExists) {
                     throw new GroupProxyUserNotFoundException(
                             BaseErrorCode.LOOKUP_NOT_FOUND,
                             "[ERROR]: lookup 매핑이 존재하지 않습니다. groupId=" + groupId
