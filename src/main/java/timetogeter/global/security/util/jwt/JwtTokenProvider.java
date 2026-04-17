@@ -18,7 +18,6 @@ import java.security.Key;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Component
@@ -93,7 +92,7 @@ public class JwtTokenProvider implements TokenProvider {
 
     @Override
     public String validateToken(String token) {
-        if (!Objects.nonNull(token) || token.isBlank()) {
+        if (token == null || token.isBlank()) {
             throw new InvalidJwtException(BaseErrorCode.INVALID_TOKEN, "[ERROR] 토큰이 비어있습니다.");
         }
         //
