@@ -37,6 +37,7 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -79,7 +80,15 @@ public class GroupManageMemberService {
     @Transactional
     public InviteGroup1Response inviteGroup1(InviteGroup1Request request,String userId) {
         String groupId = request.groupId();
-        GroupProxyUser groupProxyUser = GroupLookupSupport.findGroupProxyUserWithFallbackOrThrow(
+        boolean groupExists = groupRepository.findByGroupId(groupId).isPresent();
+        if (!groupExists) {
+            throw new GroupIdNotFoundException(
+                    BaseErrorCode.GROUP_NOT_FOUND,
+                    "[ERROR]: 존재하지 않는 그룹입니다: " + groupId
+            );
+        }
+
+        Optional<GroupProxyUser> groupProxyUser = GroupLookupSupport.findGroupProxyUserWithFallback(
                 groupProxyUserRepository,
                 userId,
                 groupId,
@@ -87,13 +96,30 @@ public class GroupManageMemberService {
                 request.lookupVersion(),
                 request.encGroupId(),
                 groupLookupFallbackEnabled,
-                () -> new GroupProxyUserNotFoundException(
-                        BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
-                        "[ERROR]: 해당 그룹 프록시 정보가 없습니다."
-                ),
                 "/api/v1/group/invite1"
         );
-        String encEncGroupMemberId = groupProxyUser.getEncGroupMemberId();
+        if (groupProxyUser.isEmpty()) {
+            boolean hasLookup = GroupLookupSupport.hasLookup(request.lookupId(), request.lookupVersion());
+            if (hasLookup) {
+                boolean lookupExists = groupProxyUserRepository.existsByGroupIdAndLookup(
+                        groupId,
+                        request.lookupId(),
+                        request.lookupVersion()
+                );
+                if (!lookupExists) {
+                    throw new GroupProxyUserNotFoundException(
+                            BaseErrorCode.LOOKUP_NOT_FOUND,
+                            "[ERROR]: lookup 매핑이 존재하지 않습니다. groupId=" + groupId
+                    );
+                }
+            }
+            throw new GroupProxyUserNotFoundException(
+                    BaseErrorCode.PROXY_USER_NOT_FOUND,
+                    "[ERROR]: 해당 그룹 프록시 사용자 정보가 없습니다. groupId=" + groupId + ", userId=" + userId
+            );
+        }
+
+        String encEncGroupMemberId = groupProxyUser.get().getEncGroupMemberId();
 
         return new InviteGroup1Response(encEncGroupMemberId);
     }

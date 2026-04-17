@@ -239,6 +239,9 @@ public class GroupManageController {
             description = """
         lookup 모드 요청 계약: groupId + lookupId + lookupVersion (필수)
         encGroupId는 legacy fallback용 선택 필드이며, fallback 비활성화 시 무시/실패될 수 있습니다.
+        lookupId 규칙: trim 후 소문자 기준 64-char hex
+        lookupVersion 규칙: 현재 1만 지원
+        lookup 인덱스 키 기준: (groupId, lookupId, lookupVersion)
         그룹원이 계약에 맞는 식별값을 서버에 전송하면,
         서버는 GroupProxyUser 테이블에서 encencGroupMemberId를 반환합니다.
         """,
@@ -254,11 +257,11 @@ public class GroupManageController {
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = {
                                     @ExampleObject(name = "groupId 누락", value = """
-                    { "code": 400, "message": "groupId는 필수입니다." }
+                    { "businessCode":"INVALID_PARAMETER", "code": 1000, "message": "groupId는 필수입니다.", "requestId":"9c98d1aa-8f4e-4b31-b9fa-9fb25c8f9c3e" }
                     """),
                                     @ExampleObject(name = "lookupId 형식 오류", value = """
-                    { "code": 400, "message": "lookupId 형식이 올바르지 않아요" }
-                    """)
+                    { "businessCode":"LOOKUP_INVALID_FORMAT", "code": 400, "message": "lookupId 형식이 올바르지 않아요", "requestId":"9c98d1aa-8f4e-4b31-b9fa-9fb25c8f9c3e" }
+                                    """)
                             }
                     )
             ),
@@ -284,9 +287,17 @@ public class GroupManageController {
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(value = """
-                { "code": 404, "message": "해당 객체가 존재하지 않습니다." }
+                            examples = {
+                                    @ExampleObject(name = "그룹 없음", value = """
+                { "businessCode":"GROUP_NOT_FOUND", "code": 404, "message": "그룹이 존재하지 않아요", "requestId":"9c98d1aa-8f4e-4b31-b9fa-9fb25c8f9c3e" }
+                """),
+                                    @ExampleObject(name = "lookup 매핑 없음", value = """
+                { "businessCode":"LOOKUP_NOT_FOUND", "code": 404, "message": "lookup 매핑을 찾을 수 없어요", "requestId":"9c98d1aa-8f4e-4b31-b9fa-9fb25c8f9c3e" }
+                """),
+                                    @ExampleObject(name = "proxy user 없음", value = """
+                { "businessCode":"PROXY_USER_NOT_FOUND", "code": 404, "message": "프록시 사용자 매핑을 찾을 수 없어요", "requestId":"9c98d1aa-8f4e-4b31-b9fa-9fb25c8f9c3e" }
                 """)
+                            }
                     )
             ),
             @ApiResponse(responseCode = "409", description = "버전/상태 충돌 (LOOKUP_CONFLICT 성격)",

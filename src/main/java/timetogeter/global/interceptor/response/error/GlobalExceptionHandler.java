@@ -16,6 +16,7 @@ import timetogeter.global.interceptor.response.error.status.BaseErrorCode;
 import timetogeter.global.interceptor.response.StatusCode;
 
 import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 @RestControllerAdvice
@@ -41,9 +42,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ) {
         StatusCode statusCode = resolveValidationStatusCode(request);
         String route = resolveRequestPath(request);
+        String requestId = resolveRequestId(request);
         log.warn("GlobalExceptionHandler.handleMethodArgumentNotValidException requestId={}, route={}, code={}",
-                resolveRequestId(request), route, statusCode.getCode(), e);
-        return toObjectResponse(ErrorResponse.of(statusCode));
+                requestId, route, statusCode.getCode(), e);
+        return toObjectResponse(ErrorResponse.of(statusCode, requestId), requestId, request);
     }
 
     @Override
@@ -55,9 +57,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ) {
         StatusCode statusCode = resolveValidationStatusCode(request);
         String route = resolveRequestPath(request);
+        String requestId = resolveRequestId(request);
         log.warn("GlobalExceptionHandler.handleHttpMessageNotReadableException requestId={}, route={}, code={}",
-                resolveRequestId(request), route, statusCode.getCode(), e);
-        return toObjectResponse(ErrorResponse.of(statusCode));
+                requestId, route, statusCode.getCode(), e);
+        return toObjectResponse(ErrorResponse.of(statusCode, requestId), requestId, request);
     }
 
     private StatusCode resolveValidationStatusCode(WebRequest request) {
@@ -82,7 +85,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         if (correlationId != null && !correlationId.isBlank()) {
             return correlationId;
         }
-        return "N/A";
+        return UUID.randomUUID().toString();
     }
 
     private String resolveRequestPath(WebRequest request) {
@@ -92,7 +95,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return null;
     }
 
-    private ResponseEntity<Object> toObjectResponse(ResponseEntity<ErrorResponse> response) {
+    private ResponseEntity<Object> toObjectResponse(
+            ResponseEntity<ErrorResponse> response,
+            String requestId,
+            WebRequest request
+    ) {
+        if (request instanceof ServletWebRequest servletWebRequest && requestId != null && !requestId.isBlank()) {
+            if (servletWebRequest.getResponse() != null) {
+                servletWebRequest.getResponse().setHeader("X-Request-Id", requestId);
+            }
+        }
         return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
     }
 

@@ -50,6 +50,8 @@ public enum BaseErrorCode implements StatusCode {
     LOOKUP_INVALID_FORMAT(400, HttpStatus.BAD_REQUEST, "lookupId 형식이 올바르지 않아요"),
     LOOKUP_VERSION_UNSUPPORTED(400, HttpStatus.BAD_REQUEST, "지원하지 않는 lookupVersion 이에요"),
     LOOKUP_LEGACY_FALLBACK_DISABLED(400, HttpStatus.BAD_REQUEST, "legacy fallback 이 종료되어 lookup 필드가 필요해요"),
+    LOOKUP_NOT_FOUND(404, HttpStatus.NOT_FOUND, "lookup 매핑을 찾을 수 없어요"),
+    LOOKUP_CONFLICT(409, HttpStatus.CONFLICT, "lookup 요청 상태가 충돌합니다."),
     VOTE_NUM_MAX(400, HttpStatus.BAD_REQUEST, "더이상 투표할 수 없어요"),
     PAGE_NOT_FOUND(400, HttpStatus.BAD_REQUEST, "총 페이지를 초과한 요청이에요"),
     INVALID_VOTE(403, HttpStatus.FORBIDDEN, "투표 취소권한이 없어요"),
@@ -69,6 +71,7 @@ public enum BaseErrorCode implements StatusCode {
     NOT_GROUP_MANAGER_ERROR(500, HttpStatus.UNAUTHORIZED, "그룹 방장이 아니므로 그룹 정보를 수정할 수 없습니다."),
     NOT_GROUP_MEMBER_ERROR(403, HttpStatus.UNAUTHORIZED, "그룹 멤버가 아닙니다."),
     GROUP_INVITECODE_EXPIRED(403, HttpStatus.FORBIDDEN, "초대코드가 만료되었거나 유효하지 않습니다."),
+    PROXY_USER_NOT_FOUND(404, HttpStatus.NOT_FOUND, "프록시 사용자 매핑을 찾을 수 없어요"),
     GROUP_PROXY_USER_NOT_FOUND(404, HttpStatus.NOT_FOUND, "해당 객체가 존재하지 않습니다."),
     GROUP_SHARE_KEY_NOT_FOUND(404,HttpStatus.NOT_FOUND, "해당 객체가 존재하지 않습니다." ),
 
