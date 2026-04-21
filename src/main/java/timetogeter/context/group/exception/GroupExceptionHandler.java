@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import timetogeter.global.interceptor.response.StatusCode;
+import timetogeter.global.interceptor.response.error.status.BaseErrorCode;
 import timetogeter.global.interceptor.response.error.dto.ErrorResponse;
 
 import java.util.UUID;
@@ -81,8 +83,25 @@ public class GroupExceptionHandler {
             HttpServletRequest request,
             HttpServletResponse response
     ) {
-        log.error("GroupExceptionHandler.handle_GroupProxyUserNotFoundException <{}> {}", e.getMessage(), e);
-        return withRequestId(ErrorResponse.of(e.getStatus(), resolveRequestId(request)), response);
+        String requestId = resolveRequestId(request);
+        StatusCode statusCode = e.getStatus();
+        String businessCode = (statusCode instanceof Enum<?>)
+                ? ((Enum<?>) statusCode).name()
+                : statusCode.getClass().getSimpleName();
+        int httpStatus = (statusCode instanceof BaseErrorCode)
+                ? ((BaseErrorCode) statusCode).getHttpStatus().value()
+                : -1;
+        log.warn(
+                "GroupExceptionHandler.handle_GroupProxyUserNotFoundException requestId={}, path={}, businessCode={}, code={}, httpStatus={}, message={}",
+                requestId,
+                request.getRequestURI(),
+                businessCode,
+                statusCode.getCode(),
+                httpStatus,
+                e.getMessage(),
+                e
+        );
+        return withRequestId(ErrorResponse.of(statusCode, requestId), response);
     }
 
     @ExceptionHandler(GroupLookupValidationException.class)

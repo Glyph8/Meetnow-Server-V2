@@ -80,7 +80,7 @@ public class GroupManageDisplayService {
             Group group = groupRepository.findByGroupId(groupId)
                     .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND, "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
 
-            // 해당 그룹에 속한 사용자 encId 목록 조회
+            // 해당 그룹에 속한 사용자 encId 목록 조회 (groupKey로 암호화된 encUserId)
             List<String> encUserIdList = groupShareKeyRepository.findEncUserIdsByGroupId(groupId);
 
             // 응답 객체 생성

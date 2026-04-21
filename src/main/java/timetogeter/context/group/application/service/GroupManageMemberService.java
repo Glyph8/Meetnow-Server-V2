@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -111,18 +112,21 @@ public class GroupManageMemberService {
                 ) > 0;
                 if (!lookupExists) {
                     String canonicalLookupId = GroupLookupSupport.generateLookupId(userId, groupId);
-                    if (!canonicalLookupId.equals(request.lookupId())) {
-                        lookupExists = groupProxyUserRepository.countByGroupIdAndLookup(
-                                groupId,
-                                canonicalLookupId,
-                                request.lookupVersion()
-                        ) > 0;
-                    }
-                }
-                if (!lookupExists) {
+                    boolean canonicalTried = !canonicalLookupId.equals(request.lookupId());
+                    log.warn("invite1 lookup miss userId={}, groupId={}, reqLookupId={}, reqLookupVersion={}, canonicalLookupId={}, canonicalTried={}, fallbackEnabled={}, hasEncGroupId={}",
+                            userId,
+                            groupId,
+                            request.lookupId(),
+                            request.lookupVersion(),
+                            canonicalLookupId,
+                            canonicalTried,
+                            groupLookupFallbackEnabled,
+                            request.encGroupId() != null && !request.encGroupId().isBlank());
                     throw new GroupProxyUserNotFoundException(
                             BaseErrorCode.LOOKUP_NOT_FOUND,
                             "[ERROR]: lookup 매핑이 존재하지 않습니다. groupId=" + groupId
+                                    + ", lookupVersion=" + request.lookupVersion()
+                                    + ", canonicalTried=" + canonicalTried
                     );
                 }
             }
@@ -215,23 +219,47 @@ public class GroupManageMemberService {
                 request.lookupId(), request.lookupVersion(), groupId, "/api/v1/group/member/save"
         );
 
-        //GroupProxyUser에 저장
-        groupProxyUserRepository.save(GroupProxyUser.of(
-                userId,
-                groupId,
-                encGroupId,
-                lookup.lookupId(),
-                lookup.lookupVersion(),
-                encencGroupMemberId,
-                System.currentTimeMillis()
-        ));
+        Optional<GroupProxyUser> existing = groupProxyUserRepository.findByUserIdAndGroupId(userId, groupId);
+        if (existing.isPresent()) {
+            if (groupShareKeyRepository.findByGroupIdAndEncGroupKey(groupId, encGroupKey).isEmpty()) {
+                log.warn("member/save groupShareKey missing for existing member userId={}, groupId={}", userId, groupId);
+            }
+            Group joinedGroupName = groupRepository.findByGroupId(groupId)
+                    .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND,
+                            "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
+            return new JoinGroupResponse(joinedGroupName.getGroupName() + "그룹에 참여 완료했어요.");
+        }
 
-        //GroupShareKey에 저장
-        groupShareKeyRepository.save(GroupShareKey.of(groupId, encUserId, encGroupKey));
+        try {
+            groupProxyUserRepository.save(GroupProxyUser.of(
+                    userId,
+                    groupId,
+                    encGroupId,
+                    lookup.lookupId(),
+                    lookup.lookupVersion(),
+                    encencGroupMemberId,
+                    System.currentTimeMillis()
+            ));
+        } catch (DataIntegrityViolationException e) {
+            if (groupProxyUserRepository.findByUserIdAndGroupId(userId, groupId).isPresent()) {
+                if (groupShareKeyRepository.findByGroupIdAndEncGroupKey(groupId, encGroupKey).isEmpty()) {
+                    log.warn("member/save groupShareKey missing for existing member userId={}, groupId={}", userId, groupId);
+                }
+                Group joinedGroupName = groupRepository.findByGroupId(groupId)
+                        .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND,
+                                "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
+                return new JoinGroupResponse(joinedGroupName.getGroupName() + "그룹에 참여 완료했어요.");
+            }
+            throw e;
+        }
 
-        // response 구성
+        if (groupShareKeyRepository.findByGroupIdAndEncGroupKey(groupId, encGroupKey).isEmpty()) {
+            groupShareKeyRepository.save(GroupShareKey.of(groupId, encUserId, encGroupKey));
+        }
+
         Group joinedGroupName = groupRepository.findByGroupId(groupId)
-                .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND, "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
+                .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND,
+                        "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
         return new JoinGroupResponse(joinedGroupName.getGroupName() + "그룹에 참여 완료했어요.");
     }
 
@@ -289,27 +317,51 @@ public class GroupManageMemberService {
                 request.lookupId(), request.lookupVersion(), groupId, "/api/v1/group/join"
         );
 
-        //GroupProxyUser에 저장
-        groupProxyUserRepository.save(GroupProxyUser.of(
-                userId,
-                groupId,
-                encGroupId,
-                lookup.lookupId(),
-                lookup.lookupVersion(),
-                encencGroupMemberId,
-                System.currentTimeMillis()
-        ));
+        Optional<GroupProxyUser> existing = groupProxyUserRepository.findByUserIdAndGroupId(userId, groupId);
+        if (existing.isPresent()) {
+            if (groupShareKeyRepository.findByGroupIdAndEncGroupKey(groupId, encGroupKey).isEmpty()) {
+                log.warn("joinGroup groupShareKey missing for existing member userId={}, groupId={}", userId, groupId);
+            }
+            redisTemplate.delete(key);
+            Group joinedGroupName = groupRepository.findByGroupId(groupId)
+                    .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND,
+                            "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
+            return new JoinGroupResponse(joinedGroupName.getGroupName() + "그룹에 참여 완료했어요.");
+        }
 
-        //GroupShareKey에 저장
-        groupShareKeyRepository.save(GroupShareKey.of(groupId, encUserId, encGroupKey));
+        try {
+            groupProxyUserRepository.save(GroupProxyUser.of(
+                    userId,
+                    groupId,
+                    encGroupId,
+                    lookup.lookupId(),
+                    lookup.lookupVersion(),
+                    encencGroupMemberId,
+                    System.currentTimeMillis()
+            ));
+        } catch (DataIntegrityViolationException e) {
+            if (groupProxyUserRepository.findByUserIdAndGroupId(userId, groupId).isPresent()) {
+                if (groupShareKeyRepository.findByGroupIdAndEncGroupKey(groupId, encGroupKey).isEmpty()) {
+                    log.warn("joinGroup groupShareKey missing for existing member userId={}, groupId={}", userId, groupId);
+                }
+                redisTemplate.delete(key);
+                Group joinedGroupName = groupRepository.findByGroupId(groupId)
+                        .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND,
+                                "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
+                return new JoinGroupResponse(joinedGroupName.getGroupName() + "그룹에 참여 완료했어요.");
+            }
+            throw e;
+        }
 
-        //해당 키 사용 완료
+        if (groupShareKeyRepository.findByGroupIdAndEncGroupKey(groupId, encGroupKey).isEmpty()) {
+            groupShareKeyRepository.save(GroupShareKey.of(groupId, encUserId, encGroupKey));
+        }
+
         redisTemplate.delete(key);
 
-
-        //5. response 구성
         Group joinedGroupName = groupRepository.findByGroupId(groupId)
-                .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND, "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
+                .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND,
+                        "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
         return new JoinGroupResponse(joinedGroupName.getGroupName() + "그룹에 참여 완료했어요.");
     }
 
