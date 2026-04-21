@@ -27,7 +27,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "/api/v1/group/member/save",
             "/api/v1/group/leave1",
             "/api/v1/group/leave2",
-            "/api/v1/group/edit1"
+            "/api/v1/group/edit1",
+            "/api/v1/promise/create1",
+            "/api/v1/promise/promisekey2",
+            "/promise/create1",
+            "/promise/promisekey2"
     );
 
     // 기존 컨텍스트별 ExceptionHandler에서 처리하지 못하는

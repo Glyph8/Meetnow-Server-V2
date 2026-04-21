@@ -99,9 +99,6 @@ public class GroupManageMemberService {
                 groupLookupFallbackEnabled,
                 "/api/v1/group/invite1"
         );
-        if (groupProxyUser.isEmpty() && request.encGroupId() != null && !request.encGroupId().isBlank()) {
-            groupProxyUser = groupProxyUserRepository.findByUserIdAndEncGroupId(userId, request.encGroupId());
-        }
         if (groupProxyUser.isEmpty()) {
             boolean hasLookup = GroupLookupSupport.hasLookup(request.lookupId(), request.lookupVersion());
             if (hasLookup) {
@@ -116,9 +113,9 @@ public class GroupManageMemberService {
                     log.warn("invite1 lookup miss userId={}, groupId={}, reqLookupId={}, reqLookupVersion={}, canonicalLookupId={}, canonicalTried={}, fallbackEnabled={}, hasEncGroupId={}",
                             userId,
                             groupId,
-                            request.lookupId(),
+                            GroupLookupSupport.maskLookupId(request.lookupId()),
                             request.lookupVersion(),
-                            canonicalLookupId,
+                            GroupLookupSupport.maskLookupId(canonicalLookupId),
                             canonicalTried,
                             groupLookupFallbackEnabled,
                             request.encGroupId() != null && !request.encGroupId().isBlank());
@@ -319,9 +316,7 @@ public class GroupManageMemberService {
 
         Optional<GroupProxyUser> existing = groupProxyUserRepository.findByUserIdAndGroupId(userId, groupId);
         if (existing.isPresent()) {
-            if (groupShareKeyRepository.findByGroupIdAndEncGroupKey(groupId, encGroupKey).isEmpty()) {
-                log.warn("joinGroup groupShareKey missing for existing member userId={}, groupId={}", userId, groupId);
-            }
+            ensureGroupShareKeyExists(groupId, encUserId, encGroupKey, userId);
             redisTemplate.delete(key);
             Group joinedGroupName = groupRepository.findByGroupId(groupId)
                     .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND,
@@ -341,9 +336,7 @@ public class GroupManageMemberService {
             ));
         } catch (DataIntegrityViolationException e) {
             if (groupProxyUserRepository.findByUserIdAndGroupId(userId, groupId).isPresent()) {
-                if (groupShareKeyRepository.findByGroupIdAndEncGroupKey(groupId, encGroupKey).isEmpty()) {
-                    log.warn("joinGroup groupShareKey missing for existing member userId={}, groupId={}", userId, groupId);
-                }
+                ensureGroupShareKeyExists(groupId, encUserId, encGroupKey, userId);
                 redisTemplate.delete(key);
                 Group joinedGroupName = groupRepository.findByGroupId(groupId)
                         .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND,
@@ -353,9 +346,7 @@ public class GroupManageMemberService {
             throw e;
         }
 
-        if (groupShareKeyRepository.findByGroupIdAndEncGroupKey(groupId, encGroupKey).isEmpty()) {
-            groupShareKeyRepository.save(GroupShareKey.of(groupId, encUserId, encGroupKey));
-        }
+        ensureGroupShareKeyExists(groupId, encUserId, encGroupKey, userId);
 
         redisTemplate.delete(key);
 
@@ -363,6 +354,15 @@ public class GroupManageMemberService {
                 .orElseThrow(() -> new GroupIdNotFoundException(BaseErrorCode.GROUP_ID_NOTFOUND,
                         "[ERROR]: 존재하지 않는 그룹입니다: " + groupId));
         return new JoinGroupResponse(joinedGroupName.getGroupName() + "그룹에 참여 완료했어요.");
+    }
+
+    private void ensureGroupShareKeyExists(String groupId, String encUserId, String encGroupKey, String userId) {
+        if (groupShareKeyRepository.findByGroupIdAndEncGroupKey(groupId, encGroupKey).isPresent()) {
+            return;
+        }
+        // join 중복 요청/마이그레이션 불일치로 GroupProxyUser만 존재하는 경우 GroupShareKey를 보정한다.
+        log.warn("joinGroup groupShareKey missing for existing member userId={}, groupId={}, repairing=true", userId, groupId);
+        groupShareKeyRepository.save(GroupShareKey.of(groupId, encUserId, encGroupKey));
     }
 
     //그룹 관리 - 그룹 초대받기 - step1 - 서브 메소드

@@ -72,7 +72,7 @@ spring:
     secretKey: ${DATA_SECRET_KEY}
     redis:
       host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6390}
+      port: ${REDIS_PORT:6379}
 
 jwt:
   secretKey: ${JWT_SECRET_KEY}

@@ -266,7 +266,7 @@ public final class GroupLookupSupport {
     public record Lookup(String lookupId, Integer lookupVersion) {
     }
 
-    private static String maskLookupId(String lookupId) {
+    public static String maskLookupId(String lookupId) {
         if (lookupId == null || lookupId.length() < 8) {
             return "********";
         }

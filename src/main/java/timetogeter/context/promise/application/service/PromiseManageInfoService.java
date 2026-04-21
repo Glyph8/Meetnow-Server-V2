@@ -124,7 +124,8 @@ public class PromiseManageInfoService {
                         lookupId,
                         lookupVersion,
                         encGroupId,
-                        groupLookupFallbackEnabled
+                        groupLookupFallbackEnabled,
+                        "/api/v1/promise/create1"
                 )
                 .orElseThrow(() -> new GroupProxyUserNotFoundException(
                         BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
@@ -349,7 +350,7 @@ public class PromiseManageInfoService {
 
         if (!isManager && !hasUserPermission && (encUserId == null || encUserId.isBlank())) {
             throw new PromiseLookupValidationException(
-                    BaseErrorCode.LOOKUP_LEGACY_FALLBACK_DISABLED,
+                    BaseErrorCode.PROMISE_LOOKUP_ENC_USER_ID_REQUIRED,
                     "[ERROR]: encUserId is required for promisekey2 lookup during migration fallback. promiseId="
                             + promiseId + ", userId=" + userId + ", lookupId=" + maskLookupId(lookupId)
             );

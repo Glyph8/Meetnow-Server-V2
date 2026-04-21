@@ -18,7 +18,7 @@ public class ResponseUtil {
         String resolvedRequestId = resolveRequestId(requestId);
 
         ErrorResponse baseErrorResponse = ErrorResponse.of(status, resolvedRequestId).getBody();
-        response.setStatus(status.getCode());
+        response.setStatus(status.getHttpStatus().value());
         response.setContentType("application/json; charset=UTF-8");
         response.setHeader("X-Request-Id", resolvedRequestId);
 

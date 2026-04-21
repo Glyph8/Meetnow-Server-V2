@@ -16,8 +16,9 @@
 - fallback 제어 플래그:
   - `promise.promisekey2.fallback-enabled`
   - `group.lookup.fallback-enabled`
-- 오류 응답 형식은 기존과 동일:
-  - `{ "code": number, "message": string }`
+- 오류 응답 형식:
+  - 기본 필드: `{ "code": number, "message": string }`
+  - 추가 필드가 포함될 수 있음: `businessCode`, `requestId`
 
 ---
 
