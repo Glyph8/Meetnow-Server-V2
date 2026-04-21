@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -52,7 +53,9 @@ public class GroupDetailController {
     @Operation(summary = "그룹 정보 수정 - Step1", description = """
             방장이 그룹 정보를 수정하는 단계입니다.
 
-            - 요청: 방장이 userId와 개인키로 암호화한 그룹 아이디(encGroupId), 그룹 아이디, 수정하려는 request
+            - 요청: 방장이 userId, groupId, lookupId, lookupVersion, 수정하려는 request
+            - lookup 계약: lookupId(64-char hex), lookupVersion(현재 1) 필수
+            - encGroupId는 fallback 호환 필드(옵션)
             - 처리: Group 내 managerId == userId 인 경우 수정 요청을 반영하여 저장
             - 반환: GroupProxyUser 테이블에서 userId, encGroupId 에 해당하는 encencGroupMemberId
             """)
@@ -60,7 +63,7 @@ public class GroupDetailController {
             @ApiResponse(responseCode = "200", description = "수정 성공",
                     content = @Content(schema = @Schema(implementation = BaseResponse.class))),
 
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (필드 누락/유효성 실패)",
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (필드 누락/유효성 실패, LOOKUP_INVALID_FORMAT/LOOKUP_VERSION_UNSUPPORTED/LOOKUP_LEGACY_FALLBACK_DISABLED)",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
@@ -68,8 +71,8 @@ public class GroupDetailController {
                                     @ExampleObject(name = "groupId 누락", value = """
                                         { "code": 400, "message": "groupId는 필수입니다." }
                                         """),
-                                    @ExampleObject(name = "encGroupId 누락", value = """
-                                        { "code": 400, "message": "encGroupId는 필수입니다." }
+                                    @ExampleObject(name = "lookupId 형식 오류", value = """
+                                        { "code": 400, "message": "lookupId 형식이 올바르지 않아요" }
                                         """)
                             }
                     )),
@@ -122,7 +125,7 @@ public class GroupDetailController {
     @PostMapping(value = "/edit1", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<EditGroup1Response> editGroup1(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody EditGroup1Request request) throws Exception{
+            @RequestBody @Valid EditGroup1Request request) throws Exception{
         String managerId = userPrincipal.getId();
         EditGroup1Response response = groupManageInfoService.editGroup1(request, managerId);
         return new BaseResponse<>(response);

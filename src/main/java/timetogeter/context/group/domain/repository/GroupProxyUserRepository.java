@@ -36,6 +36,18 @@ public interface GroupProxyUserRepository extends JpaRepository<GroupProxyUser, 
             @Param("lookupVersion") Integer lookupVersion
     );
 
+    @Query(value = """
+            SELECT COUNT(*) FROM group_proxy_user
+            WHERE group_id = :groupId
+              AND lookup_id = :lookupId
+              AND lookup_version = :lookupVersion
+            """, nativeQuery = true)
+    long countByGroupIdAndLookup(
+            @Param("groupId") String groupId,
+            @Param("lookupId") String lookupId,
+            @Param("lookupVersion") Integer lookupVersion
+    );
+
     @Query(value = "SELECT * FROM group_proxy_user WHERE user_id = :userId AND group_id = :groupId", nativeQuery = true)
     Optional<GroupProxyUser> findByUserIdAndGroupId(@Param("userId") String userId, @Param("groupId") String groupId);
 
@@ -44,4 +56,7 @@ public interface GroupProxyUserRepository extends JpaRepository<GroupProxyUser, 
 
     @Query(value = "SELECT * FROM group_proxy_user WHERE enc_group_id = :encGroupId", nativeQuery = true)
     Optional<GroupProxyUser> findByEncGroupId(@Param("encGroupId") String encGroupId);
+
+    @Query(value = "SELECT * FROM group_proxy_user WHERE group_id = :groupId", nativeQuery = true)
+    List<GroupProxyUser> findAllByGroupId(@Param("groupId") String groupId);
 }

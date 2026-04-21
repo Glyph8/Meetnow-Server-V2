@@ -2,6 +2,7 @@ package timetogeter.context.promise.application.service;
 
 import lombok.extern.slf4j.Slf4j;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.beans.factory.annotation.Value;
@@ -76,6 +77,8 @@ public class PromiseManageInfoService {
 
     @Value("${promise.promisekey2.fallback-enabled:true}")
     private boolean promiseKeyFallbackEnabled;
+    @Value("${group.lookup.fallback-enabled:true}")
+    private boolean groupLookupFallbackEnabled;
 
     public PromiseManageInfoService(
             GroupProxyUserRepository groupProxyUserRepository,
@@ -120,7 +123,9 @@ public class PromiseManageInfoService {
                         groupId,
                         lookupId,
                         lookupVersion,
-                        encGroupId
+                        encGroupId,
+                        groupLookupFallbackEnabled,
+                        "/api/v1/promise/create1"
                 )
                 .orElseThrow(() -> new GroupProxyUserNotFoundException(
                         BaseErrorCode.GROUP_PROXY_USER_NOT_FOUND,
@@ -345,7 +350,7 @@ public class PromiseManageInfoService {
 
         if (!isManager && !hasUserPermission && (encUserId == null || encUserId.isBlank())) {
             throw new PromiseLookupValidationException(
-                    BaseErrorCode.BAD_REQUEST,
+                    BaseErrorCode.PROMISE_LOOKUP_ENC_USER_ID_REQUIRED,
                     "[ERROR]: encUserId is required for promisekey2 lookup during migration fallback. promiseId="
                             + promiseId + ", userId=" + userId + ", lookupId=" + maskLookupId(lookupId)
             );
@@ -399,14 +404,17 @@ public class PromiseManageInfoService {
 
     private void validateLookup(String lookupId, Integer lookupVersion) {
         if (lookupVersion == null || lookupVersion != LOOKUP_VERSION_V1) {
+            Metrics.counter("promise.lookup.validation.fail.count", "reason", "invalid_lookup_version").increment();
             throw new PromiseLookupValidationException(
-                    BaseErrorCode.BAD_REQUEST,
+                    BaseErrorCode.LOOKUP_VERSION_UNSUPPORTED,
                     "[ERROR]: invalid lookupVersion=" + lookupVersion
             );
         }
+        Metrics.counter("promise.lookup.version.count", "lookupVersion", String.valueOf(lookupVersion)).increment();
         if (lookupId == null || !LOOKUP_ID_PATTERN.matcher(lookupId).matches()) {
+            Metrics.counter("promise.lookup.validation.fail.count", "reason", "invalid_lookup_id_format").increment();
             throw new PromiseLookupValidationException(
-                    BaseErrorCode.BAD_REQUEST,
+                    BaseErrorCode.LOOKUP_INVALID_FORMAT,
                     "[ERROR]: invalid lookupId format"
             );
         }

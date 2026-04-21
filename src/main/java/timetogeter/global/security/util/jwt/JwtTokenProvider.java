@@ -92,6 +92,9 @@ public class JwtTokenProvider implements TokenProvider {
 
     @Override
     public String validateToken(String token) {
+        if (token == null || token.isBlank()) {
+            throw new InvalidJwtException(BaseErrorCode.INVALID_TOKEN, "[ERROR] 토큰이 비어있습니다.");
+        }
         //
         log.info("=== 토큰 검증 시작 ===");
         log.info("검증 토큰 (길이:" + token.length() + "): " + token);

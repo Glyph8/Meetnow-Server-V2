@@ -9,11 +9,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import timetogeter.context.auth.exception.InvalidJwtException;
 import timetogeter.context.auth.domain.adaptor.UserPrincipal;
 import timetogeter.context.group.application.dto.request.*;
 import timetogeter.context.group.application.dto.response.*;
@@ -22,6 +24,7 @@ import timetogeter.context.group.application.service.GroupManageInfoService;
 import timetogeter.context.group.application.service.GroupManageMemberService;
 import timetogeter.global.interceptor.response.BaseResponse;
 import timetogeter.global.interceptor.response.error.dto.ErrorResponse;
+import timetogeter.global.interceptor.response.error.status.BaseErrorCode;
 
 @RestController
 @RequestMapping("/api/v1/group")
@@ -129,6 +132,7 @@ public class GroupManageController {
             summary = "그룹 멤버 저장",
             description = """
         가공된 정보들을 받아 GroupProxyUser와 GroupShareKey 테이블에 저장합니다.
+        lookupId/lookupVersion은 필수이며, lookupId는 64-char 소문자 hex 형식이어야 합니다.
         그룹 참여가 완료되면 성공 메시지를 반환합니다.
         """,
             security = @SecurityRequirement(name = "BearerAuth")
@@ -149,7 +153,7 @@ public class GroupManageController {
                     """)
                     )
             ),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (필드 누락/유효성 실패)",
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (필드 누락/유효성 실패, LOOKUP_INVALID_FORMAT/LOOKUP_VERSION_UNSUPPORTED/LOOKUP_LEGACY_FALLBACK_DISABLED)",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
@@ -168,6 +172,9 @@ public class GroupManageController {
                             """),
                                     @ExampleObject(name = "encencGroupMemberId 누락", value = """
                             { "code": 400, "message": "encencGroupMemberId는 필수입니다." }
+                            """),
+                                    @ExampleObject(name = "lookupVersion 오류", value = """
+                            { "code": 400, "message": "지원하지 않는 lookupVersion 이에요" }
                             """)
                             }
                     )
@@ -213,7 +220,7 @@ public class GroupManageController {
     @PostMapping(value = "/member/save", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<JoinGroupResponse> saveGroupMember(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody SaveGroupMemberRequest request) {
+            @RequestBody @Valid SaveGroupMemberRequest request) {
         String userId = userPrincipal.getId();
         JoinGroupResponse response = groupManageMemberService.saveGroupMember(request, userId);
         return new BaseResponse<>(response);
@@ -232,7 +239,12 @@ public class GroupManageController {
     @Operation(
             summary = "그룹 초대 - Step1",
             description = """
-        그룹원이 groupId와 개인키로 암호화한 그룹 아이디를 서버에 전송하면,
+        lookup 모드 요청 계약: groupId + lookupId + lookupVersion (필수)
+        encGroupId는 legacy fallback용 선택 필드이며, fallback 비활성화 시 무시/실패될 수 있습니다.
+        lookupId 규칙: trim 후 소문자 기준 64-char hex
+        lookupVersion 규칙: 현재 1만 지원
+        lookup 인덱스 키 기준: (groupId, lookupId, lookupVersion)
+        그룹원이 계약에 맞는 식별값을 서버에 전송하면,
         서버는 GroupProxyUser 테이블에서 encencGroupMemberId를 반환합니다.
         """,
             security = @SecurityRequirement(name = "BearerAuth")
@@ -241,17 +253,17 @@ public class GroupManageController {
             @ApiResponse(responseCode = "200", description = "성공",
                     content = @Content(schema = @Schema(implementation = InviteGroup1Response.class))
             ),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (필드 누락/유효성 실패)",
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (LOOKUP_INVALID_FORMAT / LOOKUP_VERSION_UNSUPPORTED / LOOKUP_LEGACY_FALLBACK_DISABLED)",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = {
                                     @ExampleObject(name = "groupId 누락", value = """
-                    { "code": 400, "message": "groupId는 필수입니다." }
+                    { "businessCode":"INVALID_PARAMETER", "code": 1000, "message": "groupId는 필수입니다.", "requestId":"9c98d1aa-8f4e-4b31-b9fa-9fb25c8f9c3e" }
                     """),
-                                    @ExampleObject(name = "encGroupId 누락", value = """
-                    { "code": 400, "message": "encGroupId는 필수입니다." }
-                    """)
+                                    @ExampleObject(name = "lookupId 형식 오류", value = """
+                    { "businessCode":"LOOKUP_INVALID_FORMAT", "code": 400, "message": "lookupId 형식이 올바르지 않아요", "requestId":"9c98d1aa-8f4e-4b31-b9fa-9fb25c8f9c3e" }
+                                    """)
                             }
                     )
             ),
@@ -273,12 +285,29 @@ public class GroupManageController {
                 """)
                     )
             ),
-            @ApiResponse(responseCode = "422", description = "복호화/무결성 오류",
+            @ApiResponse(responseCode = "404", description = "lookup 대상 없음 (LOOKUP_NOT_FOUND 성격)",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(name = "그룹 없음", value = """
+                { "businessCode":"GROUP_NOT_FOUND", "code": 404, "message": "그룹이 존재하지 않아요", "requestId":"9c98d1aa-8f4e-4b31-b9fa-9fb25c8f9c3e" }
+                """),
+                                    @ExampleObject(name = "lookup 매핑 없음", value = """
+                { "businessCode":"LOOKUP_NOT_FOUND", "code": 404, "message": "lookup 매핑을 찾을 수 없어요", "requestId":"9c98d1aa-8f4e-4b31-b9fa-9fb25c8f9c3e" }
+                """),
+                                    @ExampleObject(name = "proxy user 없음", value = """
+                { "businessCode":"PROXY_USER_NOT_FOUND", "code": 404, "message": "프록시 사용자 매핑을 찾을 수 없어요", "requestId":"9c98d1aa-8f4e-4b31-b9fa-9fb25c8f9c3e" }
+                """)
+                            }
+                    )
+            ),
+            @ApiResponse(responseCode = "409", description = "버전/상태 충돌 (LOOKUP_CONFLICT 성격)",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = """
-                { "code": 422, "message": "encGroupId 복호화 실패" }
+                { "code": 409, "message": "lookup 요청 상태가 충돌합니다." }
                 """)
                     )
             ),
@@ -296,7 +325,10 @@ public class GroupManageController {
     @PostMapping(value = "/invite1", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<InviteGroup1Response> inviteGroup1(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody InviteGroup1Request request) throws Exception{
+            @RequestBody @Valid InviteGroup1Request request) throws Exception{
+        if (userPrincipal == null) {
+            throw new InvalidJwtException(BaseErrorCode.INVALID_TOKEN, "[ERROR] 인증 정보가 없습니다.");
+        }
         String userId = userPrincipal.getId();
         InviteGroup1Response response = groupManageMemberService.inviteGroup1(request,userId);
         return new BaseResponse<>(response);
@@ -569,6 +601,7 @@ public class GroupManageController {
     서버에서 그룹에서 나가겠냐는 메시지 반환
      */
     @Operation(summary = "그룹 나가기 - Step1", description = """
+    lookupId/lookupVersion을 기반으로 사용자의 그룹 프록시 정보를 검증한 뒤,
     서버에서 그룹에서 나가겠냐는 메시지를 반환합니다.
     사용자 확인 후, 나가기 전 메시지를 안내합니다.
 """)
@@ -576,7 +609,7 @@ public class GroupManageController {
             @ApiResponse(responseCode = "200", description = "퇴장 전 메시지 반환 성공",
                     content = @Content(schema = @Schema(implementation = LeaveGroup1Response.class))
             ),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류",
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (LOOKUP_INVALID_FORMAT/LOOKUP_VERSION_UNSUPPORTED/LOOKUP_LEGACY_FALLBACK_DISABLED 포함)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))
             ),
             @ApiResponse(responseCode = "401", description = "인증 실패",
@@ -596,7 +629,7 @@ public class GroupManageController {
     @PostMapping(value = "/leave1", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<LeaveGroup1Response> leaveGroup1(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody LeavGroup1Request request) throws Exception{
+            @RequestBody @Valid LeavGroup1Request request) throws Exception{
         String userId = userPrincipal.getId();
         LeaveGroup1Response response = groupManageMemberService.leaveGroup1(request, userId);
         return new BaseResponse(response);
@@ -607,15 +640,15 @@ public class GroupManageController {
 
     서버에서 encencMemberId 반환
      */
-    @Operation(summary = "그룹 나가기 - Step1", description = """
-    서버에서 그룹에서 나가겠냐는 메시지를 반환합니다.
-    사용자 확인 후, 나가기 전 메시지를 안내합니다.
+    @Operation(summary = "그룹 나가기 - Step2", description = """
+    lookupId/lookupVersion을 기반으로 사용자의 그룹 프록시 정보를 조회하고,
+    이후 단계에 필요한 encencGroupMemberId를 반환합니다.
 """)
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "퇴장 전 메시지 반환 성공",
-                    content = @Content(schema = @Schema(implementation = LeaveGroup1Response.class))
+            @ApiResponse(responseCode = "200", description = "encencGroupMemberId 반환 성공",
+                    content = @Content(schema = @Schema(implementation = LeaveGroup2Response.class))
             ),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류",
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (LOOKUP_INVALID_FORMAT/LOOKUP_VERSION_UNSUPPORTED/LOOKUP_LEGACY_FALLBACK_DISABLED 포함)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))
             ),
             @ApiResponse(responseCode = "401", description = "인증 실패",
@@ -635,7 +668,7 @@ public class GroupManageController {
     @PostMapping(value = "/leave2", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<LeaveGroup2Response> leaveGroup2(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody LeaveGroup2Request request) throws Exception{
+            @RequestBody @Valid LeaveGroup2Request request) throws Exception{
         String userId = userPrincipal.getId();
         LeaveGroup2Response response = groupManageMemberService.leaveGroup2(request, userId);
         return new BaseResponse(response);

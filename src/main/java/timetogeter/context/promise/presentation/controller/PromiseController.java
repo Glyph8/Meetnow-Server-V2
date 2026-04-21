@@ -138,7 +138,7 @@ public class PromiseController {
     @PostMapping(value = "/create1", produces = MediaType.APPLICATION_JSON_VALUE)
     public BaseResponse<CreatePromise1Response> createPromise1(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody CreatePromise1Request request) throws Exception{
+            @RequestBody @Valid CreatePromise1Request request) throws Exception{
         String userId = userPrincipal.getId();
         CreatePromise1Response response = promiseManageInfoService.createPromise1(userId,request);
         return new BaseResponse<>(response);

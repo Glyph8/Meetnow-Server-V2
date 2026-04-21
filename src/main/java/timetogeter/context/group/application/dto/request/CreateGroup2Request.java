@@ -1,21 +1,28 @@
 package timetogeter.context.group.application.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+
+@Schema(requiredProperties = {
+        "groupId",
+        "encGroupId",
+        "encencGroupMemberId",
+        "encUserId",
+        "encGroupKey",
+        "lookupId",
+        "lookupVersion"
+})
 public record CreateGroup2Request(
-        String groupId, //그룹 아이디
-        String encGroupId, //개인키로 암호화한 그룹 아이디
-        String encencGroupMemberId, //개인키로 암호화한 (그룹키로 암호화한 사용자 고유 아이디)
-        String encUserId, //그룹키로 암호화한 사용자 고유 아이디
-        String encGroupKey, //개인키로 암호화한 그룹키
-        String lookupId,
-        Integer lookupVersion
+        @NotBlank String groupId, //그룹 아이디
+        @NotBlank String encGroupId, //개인키로 암호화한 그룹 아이디
+        @NotBlank String encencGroupMemberId, //개인키로 암호화한 (그룹키로 암호화한 사용자 고유 아이디)
+        @NotBlank String encUserId, //그룹키로 암호화한 사용자 고유 아이디
+        @NotBlank String encGroupKey, //개인키로 암호화한 그룹키
+        @Schema(description = "조회 인덱스 식별자(64-char hex)", example = "4f53cda18c2baa0c0354bb5f9a3ecbe5ed4f52f5f5c2f7f8052e8b6a85bf8d52", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotBlank @Pattern(regexp = "^[0-9a-f]{64}$") String lookupId,
+        @Schema(description = "조회 인덱스 버전(현재 1)", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotNull Integer lookupVersion
 ) {
-    public CreateGroup2Request(
-            String groupId,
-            String encGroupId,
-            String encencGroupMemberId,
-            String encUserId,
-            String encGroupKey
-    ) {
-        this(groupId, encGroupId, encencGroupMemberId, encUserId, encGroupKey, null, null);
-    }
 }

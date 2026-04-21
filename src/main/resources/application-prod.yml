@@ -71,8 +71,8 @@ spring:
   data:
     secretKey: ${DATA_SECRET_KEY}
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 jwt:
   secretKey: ${JWT_SECRET_KEY}
@@ -101,4 +101,8 @@ server:
 
 promise:
   promisekey2:
-    fallback-enabled: true
+    fallback-enabled: ${PROMISE_KEY_FALLBACK_ENABLED:true}
+
+group:
+  lookup:
+    fallback-enabled: ${GROUP_LOOKUP_FALLBACK_ENABLED:true}

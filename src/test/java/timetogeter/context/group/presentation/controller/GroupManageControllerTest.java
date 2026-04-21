@@ -342,7 +342,9 @@ class GroupManageControllerTest extends RestDocsSupport {
                     "HcFINyWax1NGlY99f3b4M81aFPIveL7Uct7k2j3wq6pSFMQi76jivIPVPGJoxbT6l2QCCQ==",
                     "aIswNz3D7j0HvvgUOzP8I5ILDJt2Y76dI8LgiBnV6e4YbM0vyc++dZSNG7Le7oIuRZ7UGw==",
                     "FyK5/hMWlJBXsh0uh75Pmz3d5+53FDwtrA==",
-                    "faYZeiGexxgysO4hImz7ALhoY7lNfrDEiC5hgfyjywe4B0TDqTFSmQ=="
+                    "faYZeiGexxgysO4hImz7ALhoY7lNfrDEiC5hgfyjywe4B0TDqTFSmQ==",
+                    "4f53cda18c2baa0c0354bb5f9a3ecbe5ed4f52f5f5c2f7f8052e8b6a85bf8d52",
+                    1
             );
 
 
@@ -549,5 +551,4 @@ class GroupManageControllerTest extends RestDocsSupport {
 
 
 }
-
 

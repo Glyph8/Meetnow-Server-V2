@@ -1,5 +1,6 @@
 package timetogeter.context.group.application.support;
 
+import io.micrometer.core.instrument.Metrics;
 import timetogeter.context.group.domain.entity.GroupProxyUser;
 import timetogeter.context.group.domain.repository.GroupProxyUserRepository;
 import timetogeter.context.group.exception.GroupLookupValidationException;
@@ -15,6 +16,8 @@ import java.util.regex.Pattern;
 public final class GroupLookupSupport {
     public static final int LOOKUP_VERSION_V1 = 1;
     private static final Pattern LOOKUP_ID_PATTERN = Pattern.compile("^[0-9a-f]{64}$");
+    private static final String UNKNOWN_ENDPOINT = "unknown";
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(GroupLookupSupport.class);
 
     private GroupLookupSupport() {
     }
@@ -23,26 +26,46 @@ public final class GroupLookupSupport {
         return lookupId != null && !lookupId.isBlank() && lookupVersion != null;
     }
 
-    public static Lookup resolveLookupForWrite(String lookupId, Integer lookupVersion, String userId, String groupId) {
+    public static Lookup resolveLookupForWrite(String lookupId, Integer lookupVersion, String groupId) {
+        return resolveLookupForWriteWithEndpoint(lookupId, lookupVersion, groupId, UNKNOWN_ENDPOINT);
+    }
+
+    public static Lookup resolveLookupForWriteWithEndpoint(String lookupId, Integer lookupVersion, String groupId, String endpoint) {
         if (groupId == null || groupId.isBlank()) {
+            validationFailCounter("missing_group_id", endpoint).increment();
             throw new GroupLookupValidationException(
-                    BaseErrorCode.BAD_REQUEST,
+                    BaseErrorCode.LOOKUP_INVALID_FORMAT,
                     "[ERROR]: groupId is required for group lookup write"
             );
         }
         boolean hasLookupId = lookupId != null && !lookupId.isBlank();
         boolean hasLookupVersion = lookupVersion != null;
         if (hasLookupId != hasLookupVersion) {
+            validationFailCounter("lookup_pair_mismatch", endpoint).increment();
             throw new GroupLookupValidationException(
-                    BaseErrorCode.BAD_REQUEST,
+                    BaseErrorCode.LOOKUP_INVALID_FORMAT,
                     "[ERROR]: lookupId and lookupVersion must be provided together"
             );
         }
         if (!hasLookup(lookupId, lookupVersion)) {
-            return new Lookup(generateLookupId(userId, groupId), LOOKUP_VERSION_V1);
+            validationFailCounter("missing_lookup", endpoint).increment();
+            throw new GroupLookupValidationException(
+                    BaseErrorCode.LOOKUP_LEGACY_FALLBACK_DISABLED,
+                    "[ERROR]: lookupId and lookupVersion are required for group lookup write"
+            );
         }
-        validateLookup(lookupId, lookupVersion);
+        validateLookup(lookupId, lookupVersion, endpoint);
+        successCounter("lookup", endpoint).increment();
         return new Lookup(lookupId, lookupVersion);
+    }
+
+    /**
+     * @deprecated userId is no longer used for lookup resolution. Use
+     * {@link #resolveLookupForWrite(String, Integer, String)} instead.
+     */
+    @Deprecated(forRemoval = false, since = "2026-04")
+    public static Lookup resolveLookupForWrite(String lookupId, Integer lookupVersion, String userId, String groupId) {
+        return resolveLookupForWrite(lookupId, lookupVersion, groupId);
     }
 
     public static Optional<GroupProxyUser> findGroupProxyUserWithFallback(
@@ -51,37 +74,105 @@ public final class GroupLookupSupport {
             String groupId,
             String lookupId,
             Integer lookupVersion,
-            String encGroupId
+            String encGroupId,
+            boolean fallbackEnabled
+    ) {
+        return findGroupProxyUserWithFallback(
+                repository,
+                userId,
+                groupId,
+                lookupId,
+                lookupVersion,
+                encGroupId,
+                fallbackEnabled,
+                UNKNOWN_ENDPOINT
+        );
+    }
+
+    public static Optional<GroupProxyUser> findGroupProxyUserWithFallback(
+            GroupProxyUserRepository repository,
+            String userId,
+            String groupId,
+            String lookupId,
+            Integer lookupVersion,
+            String encGroupId,
+            boolean fallbackEnabled,
+            String endpoint
     ) {
         boolean hasLookup = hasLookup(lookupId, lookupVersion);
         if (hasLookup) {
             if (groupId == null || groupId.isBlank()) {
+                validationFailCounter("missing_group_id", endpoint).increment();
                 throw new GroupLookupValidationException(
-                        BaseErrorCode.BAD_REQUEST,
+                        BaseErrorCode.LOOKUP_INVALID_FORMAT,
                         "[ERROR]: groupId is required for lookup-based group proxy query"
                 );
             }
-            validateLookup(lookupId, lookupVersion);
+            validateLookup(lookupId, lookupVersion, endpoint);
             Optional<GroupProxyUser> byLookup = repository.findByUserIdAndGroupIdAndLookup(userId, groupId, lookupId, lookupVersion);
             if (byLookup.isPresent()) {
+                successCounter("lookup", endpoint).increment();
                 return byLookup;
+            }
+            String canonicalLookupId = generateLookupId(userId, groupId);
+            if (!lookupId.equals(canonicalLookupId)) {
+                Optional<GroupProxyUser> byCanonicalLookup = repository.findByUserIdAndGroupIdAndLookup(
+                        userId,
+                        groupId,
+                        canonicalLookupId,
+                        lookupVersion
+                );
+                if (byCanonicalLookup.isPresent()) {
+                    fallbackCounter("lookup_canonical", endpoint).increment();
+                    successCounter("lookup_canonical", endpoint).increment();
+                    LOGGER.info(
+                            "group lookup fallback hit by canonical lookupId: endpoint={}, userId={}, groupId={}, requestedLookupId={}, canonicalLookupId={}",
+                            endpoint,
+                            userId,
+                            groupId,
+                            maskLookupId(lookupId),
+                            maskLookupId(canonicalLookupId)
+                    );
+                    return byCanonicalLookup;
+                }
             }
             Optional<GroupProxyUser> byGroupId = repository.findByUserIdAndGroupId(userId, groupId);
             if (byGroupId.isPresent()) {
+                fallbackCounter("group_id", endpoint).increment();
+                successCounter("group_id", endpoint).increment();
+                LOGGER.info("group lookup fallback hit by groupId: endpoint={}, userId={}, groupId={}, lookupId={}", endpoint, userId, groupId, maskLookupId(lookupId));
                 return byGroupId;
             }
+            notFoundCounter("lookup", endpoint).increment();
             if (encGroupId == null || encGroupId.isBlank()) {
                 return Optional.empty();
             }
         }
 
-        if (encGroupId == null || encGroupId.isBlank()) {
+        if (!fallbackEnabled) {
+            validationFailCounter("fallback_disabled", endpoint).increment();
             throw new GroupLookupValidationException(
-                    BaseErrorCode.BAD_REQUEST,
+                    BaseErrorCode.LOOKUP_LEGACY_FALLBACK_DISABLED,
+                    "[ERROR]: legacy encGroupId fallback is disabled"
+            );
+        }
+        if (encGroupId == null || encGroupId.isBlank()) {
+            validationFailCounter("missing_lookup_or_enc_group_id", endpoint).increment();
+            throw new GroupLookupValidationException(
+                    BaseErrorCode.LOOKUP_INVALID_FORMAT,
                     "[ERROR]: either (lookupId, lookupVersion) or encGroupId is required"
             );
         }
-        return repository.findByUserIdAndEncGroupId(userId, encGroupId);
+        Optional<GroupProxyUser> byEncGroupId = repository.findByUserIdAndEncGroupId(userId, encGroupId);
+        byEncGroupId.ifPresent(result -> {
+            fallbackCounter("enc_group_id", endpoint).increment();
+            successCounter("enc_group_id", endpoint).increment();
+            LOGGER.info("group lookup fallback hit by encGroupId: endpoint={}, userId={}, lookupId={}", endpoint, userId, maskLookupId(lookupId));
+        });
+        if (byEncGroupId.isEmpty()) {
+            notFoundCounter("enc_group_id", endpoint).increment();
+        }
+        return byEncGroupId;
     }
 
     public static GroupProxyUser findGroupProxyUserWithFallbackOrThrow(
@@ -91,7 +182,32 @@ public final class GroupLookupSupport {
             String lookupId,
             Integer lookupVersion,
             String encGroupId,
+            boolean fallbackEnabled,
             Supplier<? extends RuntimeException> notFoundExceptionSupplier
+    ) {
+        return findGroupProxyUserWithFallbackOrThrow(
+                repository,
+                userId,
+                groupId,
+                lookupId,
+                lookupVersion,
+                encGroupId,
+                fallbackEnabled,
+                notFoundExceptionSupplier,
+                UNKNOWN_ENDPOINT
+        );
+    }
+
+    public static GroupProxyUser findGroupProxyUserWithFallbackOrThrow(
+            GroupProxyUserRepository repository,
+            String userId,
+            String groupId,
+            String lookupId,
+            Integer lookupVersion,
+            String encGroupId,
+            boolean fallbackEnabled,
+            Supplier<? extends RuntimeException> notFoundExceptionSupplier,
+            String endpoint
     ) {
         return findGroupProxyUserWithFallback(
                 repository,
@@ -99,20 +215,29 @@ public final class GroupLookupSupport {
                 groupId,
                 lookupId,
                 lookupVersion,
-                encGroupId
+                encGroupId,
+                fallbackEnabled,
+                endpoint
         ).orElseThrow(notFoundExceptionSupplier);
     }
 
     public static void validateLookup(String lookupId, Integer lookupVersion) {
+        validateLookup(lookupId, lookupVersion, UNKNOWN_ENDPOINT);
+    }
+
+    public static void validateLookup(String lookupId, Integer lookupVersion, String endpoint) {
         if (lookupVersion == null || lookupVersion != LOOKUP_VERSION_V1) {
+            validationFailCounter("invalid_lookup_version", endpoint).increment();
             throw new GroupLookupValidationException(
-                    BaseErrorCode.BAD_REQUEST,
+                    BaseErrorCode.LOOKUP_VERSION_UNSUPPORTED,
                     "[ERROR]: invalid group lookupVersion=" + lookupVersion
             );
         }
+        versionCounter(lookupVersion, endpoint).increment();
         if (lookupId == null || !LOOKUP_ID_PATTERN.matcher(lookupId).matches()) {
+            validationFailCounter("invalid_lookup_id_format", endpoint).increment();
             throw new GroupLookupValidationException(
-                    BaseErrorCode.BAD_REQUEST,
+                    BaseErrorCode.LOOKUP_INVALID_FORMAT,
                     "[ERROR]: invalid group lookupId format"
             );
         }
@@ -139,5 +264,39 @@ public final class GroupLookupSupport {
     }
 
     public record Lookup(String lookupId, Integer lookupVersion) {
+    }
+
+    public static String maskLookupId(String lookupId) {
+        if (lookupId == null || lookupId.length() < 8) {
+            return "********";
+        }
+        return lookupId.substring(0, 8) + "****";
+    }
+
+    private static io.micrometer.core.instrument.Counter successCounter(String path, String endpoint) {
+        return Metrics.counter("group.lookup.success.count", "path", path, "endpoint", endpointTag(endpoint));
+    }
+
+    private static io.micrometer.core.instrument.Counter fallbackCounter(String path, String endpoint) {
+        return Metrics.counter("group.lookup.fallback.count", "path", path, "endpoint", endpointTag(endpoint));
+    }
+
+    private static io.micrometer.core.instrument.Counter validationFailCounter(String reason, String endpoint) {
+        return Metrics.counter("group.lookup.validation.fail.count", "reason", reason, "endpoint", endpointTag(endpoint));
+    }
+
+    private static io.micrometer.core.instrument.Counter notFoundCounter(String path, String endpoint) {
+        return Metrics.counter("group.lookup.not_found.count", "path", path, "endpoint", endpointTag(endpoint));
+    }
+
+    private static io.micrometer.core.instrument.Counter versionCounter(Integer lookupVersion, String endpoint) {
+        return Metrics.counter("group.lookup.version.count", "lookupVersion", String.valueOf(lookupVersion), "endpoint", endpointTag(endpoint));
+    }
+
+    private static String endpointTag(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            return UNKNOWN_ENDPOINT;
+        }
+        return endpoint;
     }
 }

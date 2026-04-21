@@ -13,6 +13,9 @@ cd <repository-root>
 cp .env.local.example .env.local
 ```
 - [ ] `.env.local`에서 OAuth/AWS/AI 값 실제 값으로 수정
+- [ ] lookup 전환 플래그 확인
+  - `PROMISE_KEY_FALLBACK_ENABLED=true` (호환 운영 중)
+  - `GROUP_LOOKUP_FALLBACK_ENABLED=true` (호환 운영 중)
 
 ### 2-2. 의존 서비스 실행 (MySQL/Redis)
 ```bash
@@ -54,6 +57,9 @@ cd <repository-root>
 cp .env.prod.example .env.prod
 ```
 - [ ] DB/Redis/OAuth/AWS 실제 운영 값 입력
+- [ ] lookup 전환 플래그 운영값 확인
+  - `PROMISE_KEY_FALLBACK_ENABLED`
+  - `GROUP_LOOKUP_FALLBACK_ENABLED`
 
 ### 3-2. EC2 보안그룹 확인
 - [ ] `22` (SSH) 허용
